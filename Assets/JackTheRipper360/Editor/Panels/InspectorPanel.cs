@@ -18,10 +18,19 @@ namespace JackTheRipper360.Editor.Panels
         private string _exportFormat = "Auto";
 
         private readonly string[] _textureExportFormats = { "Auto", "PNG", "TGA", "DDS (raw)" };
-        private readonly string[] _audioExportFormats = { "Auto", "WAV", "Raw" };
-        private readonly string[] _modelExportFormats = { "Auto", "OBJ" };
+        private readonly string[] _audioExportFormats = { "Auto", "WAV", "OGG", "Raw" };
+        private readonly string[] _modelExportFormats = { "Auto", "OBJ", "FBX (ASCII)" };
         private readonly string[] _videoExportFormats = { "Auto", "Raw" };
+        private readonly string[] _animationExportFormats = { "Auto", "JSON", "FBX (ASCII)" };
         private int _formatIndex;
+
+        // Engine reimport options
+        private bool _showReimportOptions;
+        private int _targetEngineIndex; // 0=None, 1=Unity, 2=Unreal, 3=Both
+        private readonly string[] _targetEngines = { "None", "Unity", "Unreal Engine", "Both" };
+        private bool _generateMetaFiles = true;
+        private bool _generateImportSettings = true;
+        private bool _preserveStructure = true;
 
         public void Draw(AssetEntry entry)
         {
@@ -113,6 +122,71 @@ namespace JackTheRipper360.Editor.Panels
                         }
                     }
 
+                    GUILayout.Space(10);
+
+                    // Engine reimport section
+                    _showReimportOptions = EditorGUILayout.Foldout(_showReimportOptions, "Engine Reimport", true);
+                    if (_showReimportOptions)
+                    {
+                        EditorGUI.indentLevel++;
+
+                        _targetEngineIndex = EditorGUILayout.Popup("Target Engine", _targetEngineIndex, _targetEngines);
+
+                        if (_targetEngineIndex == 1 || _targetEngineIndex == 3) // Unity
+                        {
+                            _generateMetaFiles = EditorGUILayout.Toggle("Generate .meta files", _generateMetaFiles);
+                            EditorGUILayout.HelpBox(
+                                "Exports assets in Unity-ready format with .meta files containing import settings (texture compression, model scale, audio settings).",
+                                MessageType.Info);
+                        }
+
+                        if (_targetEngineIndex == 2 || _targetEngineIndex == 3) // Unreal
+                        {
+                            _generateImportSettings = EditorGUILayout.Toggle("Generate import configs", _generateImportSettings);
+                            EditorGUILayout.HelpBox(
+                                "Exports assets with Unreal import JSON configs (compression settings, LOD groups, collision generation).",
+                                MessageType.Info);
+                        }
+
+                        if (_targetEngineIndex > 0)
+                        {
+                            _preserveStructure = EditorGUILayout.Toggle("Preserve folder structure", _preserveStructure);
+
+                            GUILayout.Space(5);
+
+                            if (GUILayout.Button("Export for Engine Reimport", GUILayout.Height(28)))
+                            {
+                                string outputDir = EditorUtility.SaveFolderPanel(
+                                    $"Export for {_targetEngines[_targetEngineIndex]}", "", "");
+
+                                if (!string.IsNullOrEmpty(outputDir))
+                                {
+                                    var converter = new Core.Plugins.EngineReimportConverter();
+                                    var profile = new Core.Plugins.ConversionProfile
+                                    {
+                                        Target = (Core.Plugins.TargetEngine)_targetEngineIndex,
+                                        GenerateMetaFiles = _generateMetaFiles,
+                                        GenerateImportSettings = _generateImportSettings,
+                                        PreserveDirectoryStructure = _preserveStructure
+                                    };
+
+                                    var result = converter.ConvertAsset(entry, outputDir, profile);
+                                    if (result.Success)
+                                        EditorUtility.DisplayDialog("Reimport Export Complete",
+                                            $"Exported to:\n{result.OutputPath}\n\nFormat: {result.ConvertedFormat}" +
+                                            (result.MetaFilePath != null ? $"\nMeta: {result.MetaFilePath}" : "") +
+                                            (result.Warnings.Count > 0 ? $"\n\nWarnings: {result.Warnings.Count}" : ""),
+                                            "OK");
+                                    else
+                                        EditorUtility.DisplayDialog("Export Failed",
+                                            $"Error: {result.ErrorMessage}", "OK");
+                                }
+                            }
+                        }
+
+                        EditorGUI.indentLevel--;
+                    }
+
                     // Children info
                     if (entry.Children.Count > 0)
                     {
@@ -133,6 +207,7 @@ namespace JackTheRipper360.Editor.Panels
                 case AssetType.Audio: return _audioExportFormats;
                 case AssetType.Model: return _modelExportFormats;
                 case AssetType.Video: return _videoExportFormats;
+                case AssetType.Animation: return _animationExportFormats;
                 default: return new[] { "Raw" };
             }
         }

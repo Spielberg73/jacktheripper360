@@ -109,6 +109,39 @@ namespace JackTheRipper360.Core.Discovery
             if (header[0] == 'B' && header[1] == 'I' && header[2] == 'G' && header[3] == 'F')
                 return new FormatMatch { Type = AssetType.Archive, FormatName = "BIG Archive", Confidence = 0.9f };
 
+            // Unity Asset Bundle formats
+            if (header.Length >= 7)
+            {
+                string headerStr = System.Text.Encoding.ASCII.GetString(header, 0, Math.Min(header.Length, 10));
+                if (headerStr.StartsWith("UnityFS"))
+                    return new FormatMatch { Type = AssetType.Container, FormatName = "Unity AssetBundle (UnityFS)", Confidence = 1.0f };
+                if (headerStr.StartsWith("UnityWeb"))
+                    return new FormatMatch { Type = AssetType.Container, FormatName = "Unity AssetBundle (UnityWeb)", Confidence = 1.0f };
+                if (headerStr.StartsWith("UnityRaw"))
+                    return new FormatMatch { Type = AssetType.Container, FormatName = "Unity AssetBundle (UnityRaw)", Confidence = 1.0f };
+            }
+
+            // Unreal Engine 4/5 UAsset (magic 0xC1832A9E in little-endian = 9E 2A 83 C1)
+            if (header.Length >= 8 && header[0] == 0xC1 && header[1] == 0x83 && header[2] == 0x2A && header[3] == 0x9E)
+                return new FormatMatch { Type = AssetType.Container, FormatName = "UAsset (UE4/UE5)", Confidence = 1.0f };
+            // Also check little-endian variant
+            if (header.Length >= 8 && header[0] == 0x9E && header[1] == 0x2A && header[2] == 0x83 && header[3] == 0xC1)
+                return new FormatMatch { Type = AssetType.Container, FormatName = "UAsset (UE3/UE4)", Confidence = 1.0f };
+
+            // Unreal PAK (footer-based, check if file is large enough)
+            if (stream.Length > 64)
+            {
+                stream.Seek(stream.Length - 44, SeekOrigin.Begin);
+                byte[] footer = new byte[4];
+                stream.Read(footer, 0, 4);
+                stream.Position = savedPos;
+                if (footer[0] == 0xE1 && footer[1] == 0x12 && footer[2] == 0x6F && footer[3] == 0x5A)
+                    return new FormatMatch { Type = AssetType.Container, FormatName = "Unreal PAK", Confidence = 0.95f };
+                // Little-endian variant
+                if (footer[0] == 0x5A && footer[1] == 0x6F && footer[2] == 0x12 && footer[3] == 0xE1)
+                    return new FormatMatch { Type = AssetType.Container, FormatName = "Unreal PAK", Confidence = 0.95f };
+            }
+
             // Try extension-based detection
             return new FormatMatch { Type = AssetType.Unknown, FormatName = "Unknown", Confidence = 0 };
         }
@@ -153,6 +186,22 @@ namespace JackTheRipper360.Core.Discovery
                 // Containers
                 case ".iso": return new FormatMatch { Type = AssetType.Container, FormatName = "ISO", Confidence = 0.7f };
                 case ".xex": return new FormatMatch { Type = AssetType.Executable, FormatName = "XEX", Confidence = 0.8f };
+
+                // Unity formats
+                case ".assets": return new FormatMatch { Type = AssetType.Container, FormatName = "Unity Assets", Confidence = 0.7f };
+                case ".unity3d": return new FormatMatch { Type = AssetType.Container, FormatName = "Unity AssetBundle", Confidence = 0.8f };
+                case ".bundle": return new FormatMatch { Type = AssetType.Container, FormatName = "Unity AssetBundle", Confidence = 0.6f };
+                case ".resource": return new FormatMatch { Type = AssetType.Data, FormatName = "Unity Resource", Confidence = 0.5f };
+                case ".resS": return new FormatMatch { Type = AssetType.Data, FormatName = "Unity Streaming Resource", Confidence = 0.5f };
+
+                // Unreal Engine formats
+                case ".pak": return new FormatMatch { Type = AssetType.Container, FormatName = "Unreal PAK", Confidence = 0.8f };
+                case ".uasset": return new FormatMatch { Type = AssetType.Container, FormatName = "UAsset", Confidence = 0.8f };
+                case ".umap": return new FormatMatch { Type = AssetType.Container, FormatName = "UMap", Confidence = 0.8f };
+                case ".uexp": return new FormatMatch { Type = AssetType.Data, FormatName = "UExp (Export Data)", Confidence = 0.7f };
+                case ".ubulk": return new FormatMatch { Type = AssetType.Data, FormatName = "UBulk (Bulk Data)", Confidence = 0.7f };
+                case ".upk": return new FormatMatch { Type = AssetType.Container, FormatName = "Unreal Package (UE3)", Confidence = 0.8f };
+                case ".u": return new FormatMatch { Type = AssetType.Container, FormatName = "Unreal Package", Confidence = 0.6f };
 
                 default: return new FormatMatch { Type = AssetType.Unknown, FormatName = "Unknown", Confidence = 0 };
             }

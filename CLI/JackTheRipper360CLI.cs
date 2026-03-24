@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using JackTheRipper360.Core.Common;
 using JackTheRipper360.Core.Discovery;
+using JackTheRipper360.Core.Plugins;
+using JackTheRipper360.Core.Plugins.Unity;
+using JackTheRipper360.Core.Plugins.Unreal;
 
 namespace JackTheRipper360.CLI
 {
@@ -14,6 +17,7 @@ namespace JackTheRipper360.CLI
     ///   JackTheRipper360CLI scan <path>                 - Scan and list assets
     ///   JackTheRipper360CLI export <path> <output_dir>  - Export all assets
     ///   JackTheRipper360CLI export <path> <output_dir> --type=texture  - Export by type
+    ///   JackTheRipper360CLI reimport <path> <output_dir> --engine=unity  - Export for engine reimport
     ///   JackTheRipper360CLI info <file>                 - Show file format info
     ///   JackTheRipper360CLI list-formats                - List supported formats
     /// </summary>
@@ -39,6 +43,9 @@ namespace JackTheRipper360.CLI
 
                 case "export":
                     return args.Length >= 3 ? CommandExport(args) : MissingArg("path output_dir");
+
+                case "reimport":
+                    return args.Length >= 3 ? CommandReimport(args) : MissingArg("path output_dir --engine=unity|unreal|both");
 
                 case "info":
                     return args.Length >= 2 ? CommandInfo(args[1]) : MissingArg("file");
@@ -324,6 +331,116 @@ namespace JackTheRipper360.CLI
             return 0;
         }
 
+        static int CommandReimport(string[] args)
+        {
+            string inputPath = args[1];
+            string outputDir = args[2];
+
+            // Parse engine flag
+            TargetEngine engine = TargetEngine.Unity;
+            bool generateMeta = true;
+            bool generateImportSettings = true;
+
+            for (int i = 3; i < args.Length; i++)
+            {
+                if (args[i].StartsWith("--engine="))
+                {
+                    string engineStr = args[i].Substring(9).ToLowerInvariant();
+                    switch (engineStr)
+                    {
+                        case "unity": engine = TargetEngine.Unity; break;
+                        case "unreal": engine = TargetEngine.UnrealEngine; break;
+                        case "both": engine = TargetEngine.Both; break;
+                        default:
+                            Console.Error.WriteLine($"Unknown engine: {engineStr}. Use: unity, unreal, both");
+                            return 1;
+                    }
+                }
+                else if (args[i] == "--no-meta") generateMeta = false;
+                else if (args[i] == "--no-import-settings") generateImportSettings = false;
+            }
+
+            Console.WriteLine($"Scanning: {inputPath}");
+            Console.WriteLine($"Target engine: {engine}");
+
+            var database = new AssetDatabase();
+            var scanner = new AssetScanner(database);
+
+            if (File.Exists(inputPath))
+            {
+                var r = new ScanResult();
+                scanner.ScanFile(inputPath, r);
+            }
+            else if (Directory.Exists(inputPath))
+            {
+                scanner.ScanDirectory(inputPath);
+            }
+            else
+            {
+                Console.Error.WriteLine($"Path not found: {inputPath}");
+                return 1;
+            }
+
+            var entries = database.GetAllEntriesFlat();
+            var toConvert = new List<AssetEntry>();
+            foreach (var entry in entries)
+            {
+                if (entry.Type == AssetType.Unknown || entry.Type == AssetType.Container) continue;
+                toConvert.Add(entry);
+            }
+
+            Console.WriteLine($"Found {toConvert.Count} convertible assets.");
+            Console.WriteLine($"Converting for {engine} reimport...");
+            Console.WriteLine();
+
+            var converter = new EngineReimportConverter();
+            var profile = new ConversionProfile
+            {
+                Target = engine,
+                GenerateMetaFiles = generateMeta,
+                GenerateImportSettings = generateImportSettings,
+                PreserveDirectoryStructure = true
+            };
+
+            var batchResult = converter.ConvertBatch(
+                toConvert, outputDir, profile,
+                new Progress<BatchProgress>(p =>
+                {
+                    Console.Write($"\r  [{p.Processed}/{p.Total}] {p.CurrentAsset,-50}");
+                }));
+
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine($"Reimport export complete:");
+            Console.WriteLine($"  Succeeded: {batchResult.Succeeded}");
+            Console.WriteLine($"  Failed:    {batchResult.Failed}");
+            Console.WriteLine($"  Output:    {outputDir}");
+
+            if (batchResult.Warnings.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Warnings ({batchResult.Warnings.Count}):");
+                foreach (var w in batchResult.Warnings)
+                    Console.WriteLine($"  - {w}");
+            }
+
+            if (engine == TargetEngine.Unity || engine == TargetEngine.Both)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Unity: Drag the output folder into your Unity Project Assets/ folder.");
+                Console.WriteLine("       .meta files have been pre-generated with import settings.");
+            }
+
+            if (engine == TargetEngine.UnrealEngine || engine == TargetEngine.Both)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Unreal: Use 'Import' in Content Browser pointing to the output folder.");
+                Console.WriteLine("        JSON import configs are included for automated settings.");
+            }
+
+            return batchResult.Failed > 0 ? 2 : 0;
+        }
+
         static int CommandListFormats()
         {
             Console.WriteLine("Supported formats:");
@@ -361,6 +478,35 @@ namespace JackTheRipper360.CLI
             Console.WriteLine("  Animation:");
             Console.WriteLine("    Generic   - Bone channel keyframe data");
             Console.WriteLine("    Export:   -> JSON");
+            Console.WriteLine();
+            Console.WriteLine("  === Unity Engine Formats ===");
+            Console.WriteLine("  Unity AssetBundle:");
+            Console.WriteLine("    UnityFS   - Unity File System bundle (LZ4/LZMA/uncompressed)");
+            Console.WriteLine("    UnityWeb  - LZMA-compressed web bundle");
+            Console.WriteLine("    UnityRaw  - Uncompressed asset bundle");
+            Console.WriteLine("    .assets   - Serialized asset files");
+            Console.WriteLine("    Objects:  Texture2D, Mesh, AudioClip, AnimationClip, Shader,");
+            Console.WriteLine("              Material, Sprite, Font, TextAsset, GameObject");
+            Console.WriteLine("    Export:   -> PNG/DDS (textures), OBJ/FBX (meshes), WAV (audio)");
+            Console.WriteLine();
+            Console.WriteLine("  === Unreal Engine Formats ===");
+            Console.WriteLine("  Unreal PAK:");
+            Console.WriteLine("    .pak      - UE4/UE5 PAK archive (Zlib/LZ4/Oodle)");
+            Console.WriteLine("    .uasset   - Unreal Asset packages (UE4/UE5)");
+            Console.WriteLine("    .uexp     - Export data companion files");
+            Console.WriteLine("    .ubulk    - Bulk data (large textures, audio)");
+            Console.WriteLine("    .upk      - Unreal Package (UE3)");
+            Console.WriteLine("    Objects:  Texture2D, StaticMesh, SkeletalMesh, SoundWave,");
+            Console.WriteLine("              AnimSequence, Material, Blueprint");
+            Console.WriteLine("    Export:   -> DDS (textures), OBJ/FBX (meshes), OGG/WAV (audio)");
+            Console.WriteLine();
+            Console.WriteLine("  === Engine Reimport ===");
+            Console.WriteLine("  Unity Reimport:");
+            Console.WriteLine("    Auto-generates .meta files with import settings");
+            Console.WriteLine("    Outputs: Assets/ImportedAssets/{Textures,Models,Audio,Animations}");
+            Console.WriteLine("  Unreal Reimport:");
+            Console.WriteLine("    Auto-generates JSON import configs");
+            Console.WriteLine("    Outputs: Content/ImportedAssets/{Textures,Meshes,Audio,Animations}");
 
             return 0;
         }
@@ -371,14 +517,18 @@ namespace JackTheRipper360.CLI
             Console.WriteLine("  JackTheRipper360CLI scan <path>                     Scan and list assets");
             Console.WriteLine("  JackTheRipper360CLI export <path> <output_dir>      Export all assets");
             Console.WriteLine("  JackTheRipper360CLI export <path> <out> --type=X    Export filtered by type");
+            Console.WriteLine("  JackTheRipper360CLI reimport <path> <out> --engine=E Convert for engine reimport");
             Console.WriteLine("  JackTheRipper360CLI info <file>                     Show file format info");
             Console.WriteLine("  JackTheRipper360CLI list-formats                    List supported formats");
             Console.WriteLine();
             Console.WriteLine("Types: Texture, Audio, Model, Video, Animation");
+            Console.WriteLine("Engines: unity, unreal, both");
             Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  JackTheRipper360CLI scan /games/halo3/");
             Console.WriteLine("  JackTheRipper360CLI export game.iso ./extracted --type=texture");
+            Console.WriteLine("  JackTheRipper360CLI reimport game.iso ./unity_assets --engine=unity");
+            Console.WriteLine("  JackTheRipper360CLI reimport ./pak_files ./ue_import --engine=unreal");
             Console.WriteLine("  JackTheRipper360CLI info package.stfs");
         }
 

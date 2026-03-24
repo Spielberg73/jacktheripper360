@@ -90,6 +90,56 @@
       "offset": 0,
       "type": "Video",
       "description": "ASF/WMV/XMV Video"
+    },
+    {
+      "name": "UnityFS",
+      "magic": "556E69747946530006",
+      "offset": 0,
+      "type": "Container",
+      "description": "Unity Asset Bundle (UnityFS)"
+    },
+    {
+      "name": "UnityWeb",
+      "magic": "556E69747957656200",
+      "offset": 0,
+      "type": "Container",
+      "description": "Unity Asset Bundle (UnityWeb, LZMA compressed)"
+    },
+    {
+      "name": "UnityRaw",
+      "magic": "556E6974795261770006",
+      "offset": 0,
+      "type": "Container",
+      "description": "Unity Asset Bundle (UnityRaw, uncompressed)"
+    },
+    {
+      "name": "UnityAssets",
+      "magic": "00000000",
+      "offset": 0,
+      "type": "Container",
+      "description": "Unity Serialized Assets File",
+      "note": "Detected by header structure, not magic bytes alone"
+    },
+    {
+      "name": "UnrealPak",
+      "magic": "E1126F5A",
+      "offset": -44,
+      "type": "Container",
+      "description": "Unreal Engine PAK Archive (footer magic)"
+    },
+    {
+      "name": "UAsset_UE4",
+      "magic": "C1832A9E",
+      "offset": 0,
+      "type": "Container",
+      "description": "Unreal Engine 4/5 Asset Package (.uasset)"
+    },
+    {
+      "name": "UPK_UE3",
+      "magic": "9E2A83C1",
+      "offset": 0,
+      "type": "Container",
+      "description": "Unreal Engine 3 Package (.upk/.u)"
     }
   ]
 }

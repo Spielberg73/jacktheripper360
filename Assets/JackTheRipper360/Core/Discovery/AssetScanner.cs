@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using JackTheRipper360.Core.Common;
 using JackTheRipper360.Core.Containers;
+using JackTheRipper360.Core.Plugins.Unity;
+using JackTheRipper360.Core.Plugins.Unreal;
 
 namespace JackTheRipper360.Core.Discovery
 {
@@ -24,7 +26,8 @@ namespace JackTheRipper360.Core.Discovery
                 new XdvdfsReader(),
                 new StfsReader(),
                 new XexParser(),
-                new GenericArchiveReader()
+                new GenericArchiveReader(),
+                new UnrealPakReader()
             };
 
             _assetParsers = parsers ?? CreateDefaultParsers();
@@ -42,7 +45,11 @@ namespace JackTheRipper360.Core.Discovery
                 new Video.BinkVideoParser(),
                 new Video.XmvParser(),
                 new Models.Xbox360MeshParser(),
-                new Animation.AnimationParser()
+                new Animation.AnimationParser(),
+                // Unity Engine parsers
+                new UnityAssetParser(),
+                // Unreal Engine parsers
+                new UnrealAssetParser()
             };
         }
 

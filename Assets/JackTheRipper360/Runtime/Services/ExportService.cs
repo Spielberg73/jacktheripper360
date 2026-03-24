@@ -4,6 +4,8 @@ using System.IO;
 using System.Threading.Tasks;
 using JackTheRipper360.Core.Common;
 using JackTheRipper360.Core.Discovery;
+using JackTheRipper360.Core.Plugins.Unity;
+using JackTheRipper360.Core.Plugins.Unreal;
 
 namespace JackTheRipper360.Runtime.Services
 {
@@ -30,7 +32,11 @@ namespace JackTheRipper360.Runtime.Services
                 new Core.Video.BinkVideoParser(),
                 new Core.Video.XmvParser(),
                 new Core.Models.Xbox360MeshParser(),
-                new Core.Animation.AnimationParser()
+                new Core.Animation.AnimationParser(),
+                // Unity Engine parsers
+                new UnityAssetParser(),
+                // Unreal Engine parsers
+                new UnrealAssetParser()
             };
         }
 
