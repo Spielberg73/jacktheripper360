@@ -1,0 +1,25 @@
+{
+    "name": "JackTheRipper360.Tests",
+    "rootNamespace": "JackTheRipper360.Tests",
+    "references": [
+        "JackTheRipper360.Core",
+        "JackTheRipper360.Runtime",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

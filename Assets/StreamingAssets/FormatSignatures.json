@@ -1,0 +1,95 @@
+{
+  "signatures": [
+    {
+      "name": "XEX2",
+      "magic": "58455832",
+      "offset": 0,
+      "type": "Executable",
+      "description": "Xbox 360 Executable"
+    },
+    {
+      "name": "XDVDFS",
+      "magic": "4D4943524F534F46542A58424F582A4D45444941",
+      "offset": 65536,
+      "type": "Container",
+      "description": "Xbox 360 DVD Filesystem"
+    },
+    {
+      "name": "STFS_CON",
+      "magic": "434F4E20",
+      "offset": 0,
+      "type": "Container",
+      "description": "Console-signed STFS Package"
+    },
+    {
+      "name": "STFS_LIVE",
+      "magic": "4C495645",
+      "offset": 0,
+      "type": "Container",
+      "description": "Microsoft-signed STFS Package"
+    },
+    {
+      "name": "STFS_PIRS",
+      "magic": "50495253",
+      "offset": 0,
+      "type": "Container",
+      "description": "Unsigned STFS Package"
+    },
+    {
+      "name": "DDS",
+      "magic": "44445320",
+      "offset": 0,
+      "type": "Texture",
+      "description": "DirectDraw Surface Texture"
+    },
+    {
+      "name": "XPR0",
+      "magic": "58505230",
+      "offset": 0,
+      "type": "Texture",
+      "description": "Xbox Packed Resource v0"
+    },
+    {
+      "name": "XPR2",
+      "magic": "58505232",
+      "offset": 0,
+      "type": "Texture",
+      "description": "Xbox Packed Resource v2"
+    },
+    {
+      "name": "RIFF",
+      "magic": "52494646",
+      "offset": 0,
+      "type": "Audio",
+      "description": "RIFF Audio Container (WAV/XMA/xWMA)"
+    },
+    {
+      "name": "XACT_WaveBank",
+      "magic": "57424E44",
+      "offset": 0,
+      "type": "Audio",
+      "description": "XACT Wave Bank"
+    },
+    {
+      "name": "XACT_SoundBank",
+      "magic": "5344424B",
+      "offset": 0,
+      "type": "Audio",
+      "description": "XACT Sound Bank"
+    },
+    {
+      "name": "Bink",
+      "magic": "42494B",
+      "offset": 0,
+      "type": "Video",
+      "description": "Bink Video"
+    },
+    {
+      "name": "ASF",
+      "magic": "3026B275",
+      "offset": 0,
+      "type": "Video",
+      "description": "ASF/WMV/XMV Video"
+    }
+  ]
+}
