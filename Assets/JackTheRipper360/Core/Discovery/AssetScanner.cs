@@ -5,6 +5,8 @@ using JackTheRipper360.Core.Common;
 using JackTheRipper360.Core.Containers;
 using JackTheRipper360.Core.Plugins.Unity;
 using JackTheRipper360.Core.Plugins.Unreal;
+using JackTheRipper360.Core.Plugins.IdTech;
+using JackTheRipper360.Core.Plugins.Source;
 
 namespace JackTheRipper360.Core.Discovery
 {
@@ -27,7 +29,12 @@ namespace JackTheRipper360.Core.Discovery
                 new StfsReader(),
                 new XexParser(),
                 new GenericArchiveReader(),
-                new UnrealPakReader()
+                new UnrealPakReader(),
+                // id Tech containers
+                new IdTechPakReader(),
+                new IdTechPk3Reader(),
+                // Source Engine containers
+                new SourceVpkReader()
             };
 
             _assetParsers = parsers ?? CreateDefaultParsers();
@@ -49,7 +56,13 @@ namespace JackTheRipper360.Core.Discovery
                 // Unity Engine parsers
                 new UnityAssetParser(),
                 // Unreal Engine parsers
-                new UnrealAssetParser()
+                new UnrealAssetParser(),
+                // id Tech parsers
+                new IdTechWadParser(),
+                new IdTechBspParser(),
+                // Source Engine parsers
+                new SourceVtfParser(),
+                new SourceMdlParser()
             };
         }
 

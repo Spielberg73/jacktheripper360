@@ -6,6 +6,8 @@ using JackTheRipper360.Core.Discovery;
 using JackTheRipper360.Core.Plugins;
 using JackTheRipper360.Core.Plugins.Unity;
 using JackTheRipper360.Core.Plugins.Unreal;
+using JackTheRipper360.Core.Plugins.IdTech;
+using JackTheRipper360.Core.Plugins.Source;
 
 namespace JackTheRipper360.CLI
 {
@@ -46,6 +48,10 @@ namespace JackTheRipper360.CLI
 
                 case "reimport":
                     return args.Length >= 3 ? CommandReimport(args) : MissingArg("path output_dir --engine=unity|unreal|both");
+
+                case "detect":
+                case "detect-engine":
+                    return args.Length >= 2 ? CommandDetectEngine(args[1]) : MissingArg("path");
 
                 case "info":
                     return args.Length >= 2 ? CommandInfo(args[1]) : MissingArg("file");
@@ -331,6 +337,57 @@ namespace JackTheRipper360.CLI
             return 0;
         }
 
+        static int CommandDetectEngine(string path)
+        {
+            Console.WriteLine($"Analyzing: {path}");
+            Console.WriteLine();
+
+            EngineDetectionResult result;
+
+            if (File.Exists(path))
+            {
+                using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    result = EngineDetector.DetectFromStream(stream, path);
+                }
+            }
+            else if (Directory.Exists(path))
+            {
+                result = EngineDetector.DetectFromDirectory(path);
+            }
+            else
+            {
+                Console.Error.WriteLine($"Path not found: {path}");
+                return 1;
+            }
+
+            // Display results
+            Console.WriteLine($"  Engine:     {result.EngineName}");
+            Console.WriteLine($"  Type:       {result.Engine}");
+            Console.WriteLine($"  Confidence: {result.Confidence:P0}");
+
+            if (!string.IsNullOrEmpty(result.Version))
+                Console.WriteLine($"  Version:    {result.Version}");
+
+            if (result.Properties.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine("  Properties:");
+                foreach (var kvp in result.Properties)
+                    Console.WriteLine($"    {kvp.Key}: {kvp.Value}");
+            }
+
+            if (result.Evidence.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  Evidence ({result.Evidence.Count} indicators):");
+                foreach (var evidence in result.Evidence)
+                    Console.WriteLine($"    - {evidence}");
+            }
+
+            return 0;
+        }
+
         static int CommandReimport(string[] args)
         {
             string inputPath = args[1];
@@ -500,6 +557,31 @@ namespace JackTheRipper360.CLI
             Console.WriteLine("              AnimSequence, Material, Blueprint");
             Console.WriteLine("    Export:   -> DDS (textures), OBJ/FBX (meshes), OGG/WAV (audio)");
             Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine("  === id Tech Engine Formats ===");
+            Console.WriteLine("  Containers:");
+            Console.WriteLine("    PAK       - id Tech 2 PAK archive (Quake 1/2)");
+            Console.WriteLine("    PK3       - id Tech 3 ZIP archive (Quake 3, CoD)");
+            Console.WriteLine("    PK4       - id Tech 4 ZIP archive (Doom 3, Quake 4)");
+            Console.WriteLine("    IWAD/PWAD - Doom WAD files (maps, textures, sounds)");
+            Console.WriteLine("    WAD2/WAD3 - Quake/Half-Life texture packs");
+            Console.WriteLine("    BSP       - id Tech map files (all versions: Q1/Q2/Q3/D3)");
+            Console.WriteLine("  Assets:");
+            Console.WriteLine("    Textures  - Mip textures, flats, sprites -> TGA");
+            Console.WriteLine("    Models    - MD3 (Quake 3), MD5 (Doom 3) -> OBJ");
+            Console.WriteLine("    Lightmaps - 128x128 RGB lightmaps -> TGA");
+            Console.WriteLine("    Entities  - BSP entity lumps -> text");
+            Console.WriteLine();
+            Console.WriteLine("  === Source Engine Formats ===");
+            Console.WriteLine("  Containers:");
+            Console.WriteLine("    VPK       - Valve Pak archive (v1/v2, multi-file)");
+            Console.WriteLine("    BSP       - Source BSP maps (VBSP v19-21)");
+            Console.WriteLine("  Assets:");
+            Console.WriteLine("    VTF       - Valve Texture Format -> DDS/TGA");
+            Console.WriteLine("              Formats: DXT1/3/5, RGBA, BGR, UV88, etc.");
+            Console.WriteLine("    MDL       - Source model metadata (needs VVD+VTX for mesh)");
+            Console.WriteLine("    VMT       - Valve Material Text files");
+            Console.WriteLine();
             Console.WriteLine("  === Engine Reimport ===");
             Console.WriteLine("  Unity Reimport:");
             Console.WriteLine("    Auto-generates .meta files with import settings");
@@ -518,6 +600,7 @@ namespace JackTheRipper360.CLI
             Console.WriteLine("  JackTheRipper360CLI export <path> <output_dir>      Export all assets");
             Console.WriteLine("  JackTheRipper360CLI export <path> <out> --type=X    Export filtered by type");
             Console.WriteLine("  JackTheRipper360CLI reimport <path> <out> --engine=E Convert for engine reimport");
+            Console.WriteLine("  JackTheRipper360CLI detect <path>                   Auto-detect game engine");
             Console.WriteLine("  JackTheRipper360CLI info <file>                     Show file format info");
             Console.WriteLine("  JackTheRipper360CLI list-formats                    List supported formats");
             Console.WriteLine();
@@ -529,6 +612,7 @@ namespace JackTheRipper360.CLI
             Console.WriteLine("  JackTheRipper360CLI export game.iso ./extracted --type=texture");
             Console.WriteLine("  JackTheRipper360CLI reimport game.iso ./unity_assets --engine=unity");
             Console.WriteLine("  JackTheRipper360CLI reimport ./pak_files ./ue_import --engine=unreal");
+            Console.WriteLine("  JackTheRipper360CLI detect /games/doom3/");
             Console.WriteLine("  JackTheRipper360CLI info package.stfs");
         }
 

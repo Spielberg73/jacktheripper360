@@ -6,6 +6,8 @@ using JackTheRipper360.Core.Common;
 using JackTheRipper360.Core.Discovery;
 using JackTheRipper360.Core.Plugins.Unity;
 using JackTheRipper360.Core.Plugins.Unreal;
+using JackTheRipper360.Core.Plugins.IdTech;
+using JackTheRipper360.Core.Plugins.Source;
 
 namespace JackTheRipper360.Runtime.Services
 {
@@ -36,7 +38,13 @@ namespace JackTheRipper360.Runtime.Services
                 // Unity Engine parsers
                 new UnityAssetParser(),
                 // Unreal Engine parsers
-                new UnrealAssetParser()
+                new UnrealAssetParser(),
+                // id Tech parsers
+                new IdTechWadParser(),
+                new IdTechBspParser(),
+                // Source Engine parsers
+                new SourceVtfParser(),
+                new SourceMdlParser()
             };
         }
 

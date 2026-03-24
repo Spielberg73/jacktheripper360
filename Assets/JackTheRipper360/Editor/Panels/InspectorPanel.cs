@@ -2,6 +2,7 @@
 using UnityEngine;
 using UnityEditor;
 using JackTheRipper360.Core.Common;
+using JackTheRipper360.Core.Discovery;
 using JackTheRipper360.Editor.Styles;
 
 namespace JackTheRipper360.Editor.Panels
@@ -23,6 +24,11 @@ namespace JackTheRipper360.Editor.Panels
         private readonly string[] _videoExportFormats = { "Auto", "Raw" };
         private readonly string[] _animationExportFormats = { "Auto", "JSON", "FBX (ASCII)" };
         private int _formatIndex;
+
+        // Engine detection
+        private bool _showEngineDetection;
+        private EngineDetectionResult _cachedDetection;
+        private string _lastDetectionPath;
 
         // Engine reimport options
         private bool _showReimportOptions;
@@ -120,6 +126,49 @@ namespace JackTheRipper360.Editor.Panels
                                     EditorUtility.DisplayDialog("Export Failed", result.ErrorMessage, "OK");
                             }
                         }
+                    }
+
+                    GUILayout.Space(10);
+
+                    // Engine detection section
+                    _showEngineDetection = EditorGUILayout.Foldout(_showEngineDetection, "Engine Detection", true);
+                    if (_showEngineDetection)
+                    {
+                        EditorGUI.indentLevel++;
+
+                        if (GUILayout.Button("Detect Game Engine", GUILayout.Height(22)))
+                        {
+                            string sourcePath = entry.SourcePath;
+                            if (!string.IsNullOrEmpty(sourcePath))
+                            {
+                                if (sourcePath.Contains(":"))
+                                    sourcePath = sourcePath.Split(':')[0];
+
+                                string dir = System.IO.File.Exists(sourcePath)
+                                    ? System.IO.Path.GetDirectoryName(sourcePath)
+                                    : sourcePath;
+
+                                _cachedDetection = EngineDetector.DetectFromDirectory(dir);
+                                _lastDetectionPath = dir;
+                            }
+                        }
+
+                        if (_cachedDetection.Engine != EngineType.Unknown)
+                        {
+                            EditorGUILayout.LabelField("Engine", _cachedDetection.EngineName, EditorStyles.boldLabel);
+                            EditorGUILayout.LabelField("Confidence", $"{_cachedDetection.Confidence:P0}");
+                            if (!string.IsNullOrEmpty(_cachedDetection.Version))
+                                EditorGUILayout.LabelField("Version", _cachedDetection.Version);
+
+                            if (_cachedDetection.Evidence.Count > 0)
+                            {
+                                EditorGUILayout.LabelField($"Evidence ({_cachedDetection.Evidence.Count}):");
+                                foreach (var ev in _cachedDetection.Evidence)
+                                    EditorGUILayout.LabelField("  " + ev, EditorStyles.miniLabel);
+                            }
+                        }
+
+                        EditorGUI.indentLevel--;
                     }
 
                     GUILayout.Space(10);

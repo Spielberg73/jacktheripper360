@@ -140,6 +140,90 @@
       "offset": 0,
       "type": "Container",
       "description": "Unreal Engine 3 Package (.upk/.u)"
+    },
+    {
+      "name": "idTech_PAK",
+      "magic": "5041434B",
+      "offset": 0,
+      "type": "Container",
+      "description": "id Tech PAK Archive (Quake 1/2)"
+    },
+    {
+      "name": "ZIP_PK3_PK4",
+      "magic": "504B0304",
+      "offset": 0,
+      "type": "Archive",
+      "description": "ZIP/PK3/PK4 Archive (id Tech 3/4)"
+    },
+    {
+      "name": "IWAD",
+      "magic": "49574144",
+      "offset": 0,
+      "type": "Container",
+      "description": "Doom IWAD (Internal WAD)"
+    },
+    {
+      "name": "PWAD",
+      "magic": "50574144",
+      "offset": 0,
+      "type": "Container",
+      "description": "Doom PWAD (Patch WAD)"
+    },
+    {
+      "name": "WAD2",
+      "magic": "57414432",
+      "offset": 0,
+      "type": "Container",
+      "description": "Quake WAD2 Texture Pack"
+    },
+    {
+      "name": "WAD3",
+      "magic": "57414433",
+      "offset": 0,
+      "type": "Container",
+      "description": "Half-Life WAD3 Texture Pack"
+    },
+    {
+      "name": "IBSP",
+      "magic": "49425350",
+      "offset": 0,
+      "type": "Container",
+      "description": "id Tech BSP Map (Quake 2/3, Doom 3)"
+    },
+    {
+      "name": "VBSP",
+      "magic": "56425350",
+      "offset": 0,
+      "type": "Container",
+      "description": "Source Engine BSP Map"
+    },
+    {
+      "name": "VPK",
+      "magic": "3412AA55",
+      "offset": 0,
+      "type": "Container",
+      "description": "Source Engine VPK Archive"
+    },
+    {
+      "name": "VTF",
+      "magic": "56544600",
+      "offset": 0,
+      "type": "Texture",
+      "description": "Source Engine VTF Texture"
+    },
+    {
+      "name": "MDL_Source",
+      "magic": "49445354",
+      "offset": 0,
+      "type": "Model",
+      "description": "Source Engine/GoldSrc MDL Model"
+    },
+    {
+      "name": "MD3",
+      "magic": "49445033",
+      "offset": 0,
+      "type": "Model",
+      "description": "id Tech 3 MD3 Model (Quake 3)"
     }
   ]
 }

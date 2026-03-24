@@ -109,6 +109,55 @@ namespace JackTheRipper360.Core.Discovery
             if (header[0] == 'B' && header[1] == 'I' && header[2] == 'G' && header[3] == 'F')
                 return new FormatMatch { Type = AssetType.Archive, FormatName = "BIG Archive", Confidence = 0.9f };
 
+            // id Tech PAK format (Quake 1/2)
+            if (header[0] == 'P' && header[1] == 'A' && header[2] == 'C' && header[3] == 'K')
+                return new FormatMatch { Type = AssetType.Container, FormatName = "id Tech PAK", Confidence = 1.0f };
+
+            // id Tech PK3/PK4 (ZIP format)
+            if (header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04)
+                return new FormatMatch { Type = AssetType.Archive, FormatName = "ZIP/PK3/PK4", Confidence = 0.8f };
+
+            // WAD formats (Doom/Quake)
+            if ((header[0] == 'I' || header[0] == 'P') && header[1] == 'W' && header[2] == 'A' && header[3] == 'D')
+                return new FormatMatch { Type = AssetType.Container, FormatName = header[0] == 'I' ? "IWAD (Doom)" : "PWAD (Doom)", Confidence = 1.0f };
+            if (header[0] == 'W' && header[1] == 'A' && header[2] == 'D' && (header[3] == '2' || header[3] == '3'))
+                return new FormatMatch { Type = AssetType.Container, FormatName = $"WAD{(char)header[3]} (Quake)", Confidence = 1.0f };
+
+            // id Tech BSP formats
+            if (header[0] == 'I' && header[1] == 'B' && header[2] == 'S' && header[3] == 'P')
+            {
+                uint bspVersion = (uint)(header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24));
+                if (bspVersion == 38) return new FormatMatch { Type = AssetType.Container, FormatName = "BSP (id Tech 2/Quake 2)", Confidence = 1.0f };
+                if (bspVersion == 46 || bspVersion == 47) return new FormatMatch { Type = AssetType.Container, FormatName = "BSP (id Tech 3/Quake 3)", Confidence = 1.0f };
+                if (bspVersion == 4) return new FormatMatch { Type = AssetType.Container, FormatName = "BSP (id Tech 4/Doom 3)", Confidence = 0.9f };
+                return new FormatMatch { Type = AssetType.Container, FormatName = $"BSP (IBSP v{bspVersion})", Confidence = 0.8f };
+            }
+            if (header[0] == 'R' && header[1] == 'B' && header[2] == 'S' && header[3] == 'P')
+                return new FormatMatch { Type = AssetType.Container, FormatName = "BSP (id Tech 4 RBSP)", Confidence = 0.9f };
+
+            // Source Engine VBSP
+            if (header[0] == 'V' && header[1] == 'B' && header[2] == 'S' && header[3] == 'P')
+            {
+                uint vbspVersion = (uint)(header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24));
+                return new FormatMatch { Type = AssetType.Container, FormatName = $"BSP (Source Engine v{vbspVersion})", Confidence = 1.0f };
+            }
+
+            // Source VPK
+            if (header.Length >= 8 && header[0] == 0x34 && header[1] == 0x12 && header[2] == 0xAA && header[3] == 0x55)
+                return new FormatMatch { Type = AssetType.Container, FormatName = "VPK (Source Engine)", Confidence = 1.0f };
+
+            // Source VTF texture
+            if (header[0] == 'V' && header[1] == 'T' && header[2] == 'F' && header[3] == 0x00)
+                return new FormatMatch { Type = AssetType.Texture, FormatName = "VTF (Source Engine)", Confidence = 1.0f };
+
+            // Source MDL model
+            if (header[0] == 'I' && header[1] == 'D' && header[2] == 'S' && header[3] == 'T')
+                return new FormatMatch { Type = AssetType.Model, FormatName = "MDL (Source/GoldSrc)", Confidence = 0.95f };
+
+            // id Tech 3 MD3 model
+            if (header[0] == 'I' && header[1] == 'D' && header[2] == 'P' && header[3] == '3')
+                return new FormatMatch { Type = AssetType.Model, FormatName = "MD3 (id Tech 3)", Confidence = 1.0f };
+
             // Unity Asset Bundle formats
             if (header.Length >= 7)
             {
@@ -186,6 +235,32 @@ namespace JackTheRipper360.Core.Discovery
                 // Containers
                 case ".iso": return new FormatMatch { Type = AssetType.Container, FormatName = "ISO", Confidence = 0.7f };
                 case ".xex": return new FormatMatch { Type = AssetType.Executable, FormatName = "XEX", Confidence = 0.8f };
+
+                // id Tech formats
+                case ".pak": return new FormatMatch { Type = AssetType.Container, FormatName = "PAK Archive", Confidence = 0.7f };
+                case ".pk3": return new FormatMatch { Type = AssetType.Archive, FormatName = "PK3 (id Tech 3)", Confidence = 0.8f };
+                case ".pk4": return new FormatMatch { Type = AssetType.Archive, FormatName = "PK4 (id Tech 4)", Confidence = 0.8f };
+                case ".wad": return new FormatMatch { Type = AssetType.Container, FormatName = "WAD", Confidence = 0.7f };
+                case ".bsp": return new FormatMatch { Type = AssetType.Container, FormatName = "BSP Map", Confidence = 0.8f };
+                case ".md3": return new FormatMatch { Type = AssetType.Model, FormatName = "MD3 Model", Confidence = 0.8f };
+                case ".md5mesh": return new FormatMatch { Type = AssetType.Model, FormatName = "MD5 Mesh", Confidence = 0.8f };
+                case ".md5anim": return new FormatMatch { Type = AssetType.Animation, FormatName = "MD5 Anim", Confidence = 0.8f };
+                case ".mdl": return new FormatMatch { Type = AssetType.Model, FormatName = "MDL Model", Confidence = 0.7f };
+                case ".mtr": return new FormatMatch { Type = AssetType.Data, FormatName = "Material (id Tech 4)", Confidence = 0.6f };
+                case ".proc": return new FormatMatch { Type = AssetType.Data, FormatName = "Proc (id Tech 4)", Confidence = 0.6f };
+                case ".lmp": return new FormatMatch { Type = AssetType.Data, FormatName = "Lump (Quake)", Confidence = 0.5f };
+                case ".resources": return new FormatMatch { Type = AssetType.Container, FormatName = "Resources (id Tech 5+)", Confidence = 0.7f };
+                case ".bimage": return new FormatMatch { Type = AssetType.Texture, FormatName = "BImage (id Tech 5+)", Confidence = 0.7f };
+                case ".bmodel": return new FormatMatch { Type = AssetType.Model, FormatName = "BModel (id Tech 5+)", Confidence = 0.7f };
+
+                // Source Engine formats
+                case ".vpk": return new FormatMatch { Type = AssetType.Container, FormatName = "VPK (Source)", Confidence = 0.8f };
+                case ".vtf": return new FormatMatch { Type = AssetType.Texture, FormatName = "VTF (Source)", Confidence = 0.8f };
+                case ".vmt": return new FormatMatch { Type = AssetType.Data, FormatName = "VMT Material (Source)", Confidence = 0.7f };
+                case ".vvd": return new FormatMatch { Type = AssetType.Model, FormatName = "VVD Vertex Data (Source)", Confidence = 0.7f };
+                case ".vtx": return new FormatMatch { Type = AssetType.Model, FormatName = "VTX Strip Data (Source)", Confidence = 0.7f };
+                case ".phy": return new FormatMatch { Type = AssetType.Data, FormatName = "Physics (Source)", Confidence = 0.6f };
+                case ".pcf": return new FormatMatch { Type = AssetType.Data, FormatName = "Particle (Source)", Confidence = 0.6f };
 
                 // Unity formats
                 case ".assets": return new FormatMatch { Type = AssetType.Container, FormatName = "Unity Assets", Confidence = 0.7f };
