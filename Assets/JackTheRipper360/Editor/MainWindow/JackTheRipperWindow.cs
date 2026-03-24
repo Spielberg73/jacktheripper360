@@ -12,32 +12,41 @@ namespace JackTheRipper360.Editor.MainWindow
     /// <summary>
     /// Main EditorWindow for JackTheRipper360 - Xbox 360 Asset Extractor.
     /// Composes all UI panels and wires services together.
+    /// Features: Drag & Drop, navigation history, hex viewer, 3D preview, comparison.
     /// </summary>
     public class JackTheRipperWindow : EditorWindow
     {
         // Services
         private AssetDiscoveryService _discoveryService;
         private ExportService _exportService;
+        private HistoryService _historyService;
 
         // Panels
         private FileBrowserPanel _fileBrowserPanel;
         private AssetTreePanel _assetTreePanel;
         private PreviewPanel _previewPanel;
         private InspectorPanel _inspectorPanel;
+        private HexViewerPanel _hexViewerPanel;
+        private Preview3DPanel _preview3DPanel;
+        private AssetComparisonPanel _comparisonPanel;
 
         // State
         private AssetEntry _selectedEntry;
-        private string _statusMessage = "Ready. Open a folder or file to begin scanning.";
+        private string _statusMessage = "Ready. Open a folder or file to begin scanning. Drag & Drop supported.";
         private float _scanProgress;
         private bool _isScanning;
-        private Vector2 _scrollPosition;
 
         // Layout
         private float _leftPanelWidth = 250f;
-        private float _centerPanelWidth = 300f;
         private float _rightPanelWidth = 300f;
         private bool _resizingLeft;
         private bool _resizingRight;
+
+        // Bottom panel tabs
+        private enum BottomTab { None, HexViewer, Comparison }
+        private BottomTab _bottomTab = BottomTab.None;
+        private float _bottomPanelHeight = 200f;
+        private bool _resizingBottom;
 
         [MenuItem("Tools/JackTheRipper360 - Xbox 360 Asset Extractor")]
         public static void ShowWindow()
@@ -52,11 +61,16 @@ namespace JackTheRipper360.Editor.MainWindow
         {
             _discoveryService = new AssetDiscoveryService();
             _exportService = new ExportService();
+            _historyService = new HistoryService();
+            _historyService.Load();
 
             _fileBrowserPanel = new FileBrowserPanel();
             _assetTreePanel = new AssetTreePanel();
             _previewPanel = new PreviewPanel();
             _inspectorPanel = new InspectorPanel();
+            _hexViewerPanel = new HexViewerPanel();
+            _preview3DPanel = new Preview3DPanel();
+            _comparisonPanel = new AssetComparisonPanel();
 
             // Wire events
             _discoveryService.OnProgress += OnScanProgress;
@@ -66,44 +80,136 @@ namespace JackTheRipper360.Editor.MainWindow
             _fileBrowserPanel.OnPathSelected += OnPathSelected;
             _assetTreePanel.OnAssetSelected += OnAssetSelected;
 
-            // Load settings
+            // Enable drag & drop
+            wantsMouseMove = true;
+
             SettingsService.Load();
         }
 
         private void OnDisable()
         {
             _discoveryService?.CancelScan();
+            _preview3DPanel?.Dispose();
+            _historyService?.Save();
             SettingsService.Save();
         }
 
         private void OnGUI()
         {
+            // Handle Drag & Drop
+            HandleDragAndDrop();
+
+            // Handle keyboard shortcuts
+            HandleKeyboardShortcuts();
+
             DrawToolbar();
 
-            EditorGUILayout.BeginHorizontal();
+            // Main content area
+            float bottomHeight = _bottomTab != BottomTab.None ? _bottomPanelHeight : 0;
+
+            EditorGUILayout.BeginVertical();
             {
-                // Left panel: File browser + Asset tree
-                DrawLeftPanel();
+                // Top area: 3-panel layout
+                EditorGUILayout.BeginHorizontal(GUILayout.Height(position.height - 50 - bottomHeight));
+                {
+                    DrawLeftPanel();
+                    DrawResizer(ref _leftPanelWidth, ref _resizingLeft);
+                    DrawCenterPanel();
+                    DrawResizer(ref _rightPanelWidth, ref _resizingRight);
+                    DrawRightPanel();
+                }
+                EditorGUILayout.EndHorizontal();
 
-                // Resizer
-                DrawResizer(ref _leftPanelWidth, ref _resizingLeft);
-
-                // Center panel: Preview
-                DrawCenterPanel();
-
-                // Resizer
-                DrawResizer(ref _rightPanelWidth, ref _resizingRight);
-
-                // Right panel: Inspector
-                DrawRightPanel();
+                // Bottom panel (Hex viewer / Comparison)
+                if (_bottomTab != BottomTab.None)
+                {
+                    DrawBottomResizer();
+                    DrawBottomPanel();
+                }
             }
-            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
 
             DrawStatusBar();
 
-            // Repaint while scanning to show progress
             if (_isScanning)
                 Repaint();
+        }
+
+        private void HandleDragAndDrop()
+        {
+            Event e = Event.current;
+
+            if (e.type == EventType.DragUpdated || e.type == EventType.DragPerform)
+            {
+                if (DragAndDrop.paths != null && DragAndDrop.paths.Length > 0)
+                {
+                    DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+
+                    if (e.type == EventType.DragPerform)
+                    {
+                        DragAndDrop.AcceptDrag();
+
+                        foreach (string path in DragAndDrop.paths)
+                        {
+                            if (System.IO.Directory.Exists(path))
+                            {
+                                _historyService.AddRecentPath(path);
+                                StartScan(path);
+                                break;
+                            }
+                            else if (System.IO.File.Exists(path))
+                            {
+                                _historyService.AddRecentPath(path);
+                                StartFileScan(path);
+                                break;
+                            }
+                        }
+                    }
+
+                    e.Use();
+                }
+            }
+        }
+
+        private void HandleKeyboardShortcuts()
+        {
+            Event e = Event.current;
+            if (e.type != EventType.KeyDown) return;
+
+            // Alt+Left: Navigate back
+            if (e.alt && e.keyCode == KeyCode.LeftArrow && _historyService.CanGoBack)
+            {
+                var entry = _historyService.GoBack();
+                if (entry != null)
+                {
+                    _selectedEntry = entry;
+                    UpdatePanelsForSelection();
+                }
+                e.Use();
+            }
+            // Alt+Right: Navigate forward
+            else if (e.alt && e.keyCode == KeyCode.RightArrow && _historyService.CanGoForward)
+            {
+                var entry = _historyService.GoForward();
+                if (entry != null)
+                {
+                    _selectedEntry = entry;
+                    UpdatePanelsForSelection();
+                }
+                e.Use();
+            }
+            // Ctrl+H: Toggle hex viewer
+            else if (e.control && e.keyCode == KeyCode.H)
+            {
+                _bottomTab = _bottomTab == BottomTab.HexViewer ? BottomTab.None : BottomTab.HexViewer;
+                e.Use();
+            }
+            // Ctrl+F: Toggle favorites
+            else if (e.control && e.keyCode == KeyCode.F && _selectedEntry != null)
+            {
+                _historyService.ToggleFavorite(_selectedEntry.SourcePath ?? _selectedEntry.Name);
+                e.Use();
+            }
         }
 
         private void DrawToolbar()
@@ -114,12 +220,32 @@ namespace JackTheRipper360.Editor.MainWindow
 
                 GUILayout.FlexibleSpace();
 
+                // Navigation buttons
+                EditorGUI.BeginDisabledGroup(!_historyService.CanGoBack);
+                if (GUILayout.Button("<", EditorStyles.toolbarButton, GUILayout.Width(22)))
+                {
+                    var entry = _historyService.GoBack();
+                    if (entry != null) { _selectedEntry = entry; UpdatePanelsForSelection(); }
+                }
+                EditorGUI.EndDisabledGroup();
+
+                EditorGUI.BeginDisabledGroup(!_historyService.CanGoForward);
+                if (GUILayout.Button(">", EditorStyles.toolbarButton, GUILayout.Width(22)))
+                {
+                    var entry = _historyService.GoForward();
+                    if (entry != null) { _selectedEntry = entry; UpdatePanelsForSelection(); }
+                }
+                EditorGUI.EndDisabledGroup();
+
+                GUILayout.Space(5);
+
                 if (GUILayout.Button("Open Folder", EditorStyles.toolbarButton, GUILayout.Width(80)))
                 {
                     string path = EditorUtility.OpenFolderPanel("Select Xbox 360 Game Folder", SettingsService.Current.LastOpenedPath, "");
                     if (!string.IsNullOrEmpty(path))
                     {
                         SettingsService.Current.LastOpenedPath = path;
+                        _historyService.AddRecentPath(path);
                         StartScan(path);
                     }
                 }
@@ -128,27 +254,67 @@ namespace JackTheRipper360.Editor.MainWindow
                 {
                     string file = EditorUtility.OpenFilePanel("Select Xbox 360 File",
                         SettingsService.Current.LastOpenedPath,
-                        "iso,xex,xwb,xsb,dds,xpr,bik,wmv");
+                        "iso,xex,xwb,xsb,dds,xpr,bik,wmv,upk");
                     if (!string.IsNullOrEmpty(file))
                     {
                         SettingsService.Current.LastOpenedPath = System.IO.Path.GetDirectoryName(file);
+                        _historyService.AddRecentPath(file);
                         StartFileScan(file);
                     }
                 }
 
-                EditorGUI.BeginDisabledGroup(_selectedEntry == null);
-                if (GUILayout.Button("Export Selected", EditorStyles.toolbarButton, GUILayout.Width(100)))
+                // Recent files dropdown
+                if (_historyService.RecentPaths.Count > 0)
                 {
+                    if (GUILayout.Button("Recent", EditorStyles.toolbarDropDown, GUILayout.Width(55)))
+                    {
+                        var menu = new GenericMenu();
+                        foreach (var path in _historyService.RecentPaths)
+                        {
+                            string displayName = System.IO.Path.GetFileName(path);
+                            string capturedPath = path;
+                            menu.AddItem(new GUIContent(displayName), false, () =>
+                            {
+                                if (System.IO.Directory.Exists(capturedPath))
+                                    StartScan(capturedPath);
+                                else if (System.IO.File.Exists(capturedPath))
+                                    StartFileScan(capturedPath);
+                            });
+                        }
+                        menu.ShowAsContext();
+                    }
+                }
+
+                GUILayout.Space(5);
+
+                EditorGUI.BeginDisabledGroup(_selectedEntry == null);
+                if (GUILayout.Button("Export", EditorStyles.toolbarButton, GUILayout.Width(50)))
                     ExportSelected();
+
+                // Favorite toggle
+                if (_selectedEntry != null)
+                {
+                    bool isFav = _historyService.IsFavorite(_selectedEntry.SourcePath ?? "");
+                    if (GUILayout.Button(isFav ? "[*]" : "[ ]", EditorStyles.toolbarButton, GUILayout.Width(25)))
+                        _historyService.ToggleFavorite(_selectedEntry.SourcePath ?? _selectedEntry.Name);
                 }
                 EditorGUI.EndDisabledGroup();
 
                 EditorGUI.BeginDisabledGroup(_discoveryService?.Database?.TotalCount == 0);
-                if (GUILayout.Button("Export All", EditorStyles.toolbarButton, GUILayout.Width(70)))
-                {
+                if (GUILayout.Button("Export All", EditorStyles.toolbarButton, GUILayout.Width(65)))
                     ExportAll();
-                }
                 EditorGUI.EndDisabledGroup();
+
+                GUILayout.Space(5);
+
+                // Bottom panel toggles
+                bool hexActive = _bottomTab == BottomTab.HexViewer;
+                if (GUILayout.Toggle(hexActive, "Hex", EditorStyles.toolbarButton, GUILayout.Width(30)) != hexActive)
+                    _bottomTab = hexActive ? BottomTab.None : BottomTab.HexViewer;
+
+                bool cmpActive = _bottomTab == BottomTab.Comparison;
+                if (GUILayout.Toggle(cmpActive, "Cmp", EditorStyles.toolbarButton, GUILayout.Width(30)) != cmpActive)
+                    _bottomTab = cmpActive ? BottomTab.None : BottomTab.Comparison;
 
                 if (_isScanning)
                 {
@@ -168,10 +334,7 @@ namespace JackTheRipper360.Editor.MainWindow
             EditorGUILayout.BeginVertical(GUILayout.Width(_leftPanelWidth));
             {
                 _fileBrowserPanel.Draw();
-
                 GUILayout.Space(5);
-
-                // Asset tree
                 _assetTreePanel.Draw(_discoveryService?.Database);
             }
             EditorGUILayout.EndVertical();
@@ -181,7 +344,15 @@ namespace JackTheRipper360.Editor.MainWindow
         {
             EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));
             {
-                _previewPanel.Draw(_selectedEntry);
+                if (_selectedEntry?.Type == AssetType.Model)
+                {
+                    var rect = GUILayoutUtility.GetRect(100, 100, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                    _preview3DPanel.Draw(rect);
+                }
+                else
+                {
+                    _previewPanel.Draw(_selectedEntry);
+                }
             }
             EditorGUILayout.EndVertical();
         }
@@ -193,6 +364,44 @@ namespace JackTheRipper360.Editor.MainWindow
                 _inspectorPanel.Draw(_selectedEntry);
             }
             EditorGUILayout.EndVertical();
+        }
+
+        private void DrawBottomPanel()
+        {
+            EditorGUILayout.BeginVertical(GUILayout.Height(_bottomPanelHeight));
+            {
+                switch (_bottomTab)
+                {
+                    case BottomTab.HexViewer:
+                        _hexViewerPanel.Draw();
+                        break;
+                    case BottomTab.Comparison:
+                        _comparisonPanel.Draw();
+                        break;
+                }
+            }
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawBottomResizer()
+        {
+            var resizeRect = GUILayoutUtility.GetRect(0, 4, GUILayout.ExpandWidth(true));
+            EditorGUIUtility.AddCursorRect(resizeRect, MouseCursor.ResizeVertical);
+
+            if (Event.current.type == EventType.MouseDown && resizeRect.Contains(Event.current.mousePosition))
+                _resizingBottom = true;
+
+            if (_resizingBottom)
+            {
+                if (Event.current.type == EventType.MouseDrag)
+                {
+                    _bottomPanelHeight -= Event.current.delta.y;
+                    _bottomPanelHeight = Mathf.Clamp(_bottomPanelHeight, 100, 500);
+                    Repaint();
+                }
+                if (Event.current.type == EventType.MouseUp)
+                    _resizingBottom = false;
+            }
         }
 
         private void DrawStatusBar()
@@ -211,6 +420,12 @@ namespace JackTheRipper360.Editor.MainWindow
 
                 int total = _discoveryService?.Database?.TotalCount ?? 0;
                 GUILayout.Label($"Assets: {total}", EditorStyles.miniLabel);
+
+                int favCount = _historyService?.GetFavorites()?.Count ?? 0;
+                if (favCount > 0)
+                    GUILayout.Label($"Favs: {favCount}", EditorStyles.miniLabel);
+
+                GUILayout.Label("Drop files here", EditorStyles.miniLabel);
             }
             EditorGUILayout.EndHorizontal();
         }
@@ -255,7 +470,11 @@ namespace JackTheRipper360.Editor.MainWindow
 
         private void OnPathSelected(string path)
         {
-            StartScan(path);
+            _historyService.AddRecentPath(path);
+            if (System.IO.Directory.Exists(path))
+                StartScan(path);
+            else if (System.IO.File.Exists(path))
+                StartFileScan(path);
         }
 
         private void OnScanProgress(ScanProgress progress)
@@ -281,7 +500,22 @@ namespace JackTheRipper360.Editor.MainWindow
         private void OnAssetSelected(AssetEntry entry)
         {
             _selectedEntry = entry;
+            _historyService.NavigateTo(entry);
+            UpdatePanelsForSelection();
             Repaint();
+        }
+
+        private void UpdatePanelsForSelection()
+        {
+            // Update hex viewer
+            if (_bottomTab == BottomTab.HexViewer && _selectedEntry != null)
+                _hexViewerPanel.LoadAsset(_selectedEntry);
+
+            // Update 3D preview for models
+            if (_selectedEntry?.Type == AssetType.Model)
+            {
+                // 3D preview would be loaded here when mesh data is available
+            }
         }
 
         private void ExportSelected()
