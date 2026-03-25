@@ -97,6 +97,9 @@ namespace JackTheRipper360.Editor.MainWindow
 
         private void OnGUI()
         {
+            // Process pending results from background scan thread
+            _discoveryService?.ProcessPendingCallbacks();
+
             // Handle Drag & Drop
             HandleDragAndDrop();
 
@@ -482,6 +485,7 @@ namespace JackTheRipper360.Editor.MainWindow
         {
             _scanProgress = progress.Progress;
             _statusMessage = $"Scanning: {System.IO.Path.GetFileName(progress.CurrentFile)} ({progress.FilesProcessed}/{progress.TotalFiles})";
+            Repaint();
         }
 
         private void OnScanComplete(ScanResult result)
@@ -490,12 +494,14 @@ namespace JackTheRipper360.Editor.MainWindow
             _statusMessage = $"Scan complete. Found {result.AssetsFound} assets in {result.ContainersFound} containers.";
             if (result.Errors.Count > 0)
                 _statusMessage += $" ({result.Errors.Count} errors)";
+            Repaint();
         }
 
         private void OnScanError(string error)
         {
             _isScanning = false;
             _statusMessage = $"Error: {error}";
+            Repaint();
         }
 
         private void OnAssetSelected(AssetEntry entry)

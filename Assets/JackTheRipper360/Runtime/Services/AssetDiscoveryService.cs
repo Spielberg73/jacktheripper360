@@ -8,13 +8,20 @@ namespace JackTheRipper360.Runtime.Services
     /// <summary>
     /// Async wrapper for asset scanning. Runs Core scanners on background threads
     /// and reports progress for Unity UI updates.
+    /// Uses thread-safe pending results that the Editor window polls in OnGUI.
     /// </summary>
     public class AssetDiscoveryService
     {
         private readonly AssetDatabase _database;
         private AssetScanner _scanner;
         private CancellationTokenSource _cts;
-        private bool _isScanning;
+        private volatile bool _isScanning;
+
+        // Thread-safe pending results for main thread consumption
+        private readonly object _resultLock = new object();
+        private ScanResult _pendingResult;
+        private string _pendingError;
+        private ScanProgress _pendingProgress;
 
         public AssetDatabase Database => _database;
         public bool IsScanning => _isScanning;
@@ -30,13 +37,43 @@ namespace JackTheRipper360.Runtime.Services
         }
 
         /// <summary>
+        /// Must be called from OnGUI or EditorApplication.update to process
+        /// pending results from the background scan thread.
+        /// </summary>
+        public void ProcessPendingCallbacks()
+        {
+            lock (_resultLock)
+            {
+                if (_pendingProgress != null)
+                {
+                    OnProgress?.Invoke(_pendingProgress);
+                    _pendingProgress = null;
+                }
+
+                if (_pendingResult != null)
+                {
+                    var result = _pendingResult;
+                    _pendingResult = null;
+                    OnComplete?.Invoke(result);
+                }
+
+                if (_pendingError != null)
+                {
+                    var error = _pendingError;
+                    _pendingError = null;
+                    OnError?.Invoke(error);
+                }
+            }
+        }
+
+        /// <summary>
         /// Start scanning a directory asynchronously.
         /// </summary>
         public void StartScan(string path)
         {
             if (_isScanning)
             {
-                OnError?.Invoke("A scan is already in progress.");
+                lock (_resultLock) { _pendingError = "A scan is already in progress."; }
                 return;
             }
 
@@ -44,20 +81,21 @@ namespace JackTheRipper360.Runtime.Services
             _cts = new CancellationTokenSource();
             _isScanning = true;
 
-            var progress = new Progress<ScanProgress>(p => OnProgress?.Invoke(p));
-
             Task.Run(() =>
             {
                 try
                 {
-                    var result = _scanner.ScanDirectory(path, progress);
+                    var result = _scanner.ScanDirectory(path, new Progress<ScanProgress>(p =>
+                    {
+                        lock (_resultLock) { _pendingProgress = p; }
+                    }));
                     _isScanning = false;
-                    OnComplete?.Invoke(result);
+                    lock (_resultLock) { _pendingResult = result; }
                 }
                 catch (Exception ex)
                 {
                     _isScanning = false;
-                    OnError?.Invoke(ex.Message);
+                    lock (_resultLock) { _pendingError = ex.Message; }
                 }
             }, _cts.Token);
         }
