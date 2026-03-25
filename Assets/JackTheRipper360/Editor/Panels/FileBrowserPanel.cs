@@ -3,6 +3,7 @@ using System;
 using UnityEngine;
 using UnityEditor;
 using JackTheRipper360.Runtime.Services;
+using AppSettingsService = JackTheRipper360.Runtime.Services.SettingsService;
 
 namespace JackTheRipper360.Editor.Panels
 {
@@ -30,11 +31,11 @@ namespace JackTheRipper360.Editor.Panels
                     {
                         string path = EditorUtility.OpenFolderPanel(
                             "Select Xbox 360 Game Folder",
-                            SettingsService.Current.LastOpenedPath, "");
+                            AppSettingsService.Current.LastOpenedPath, "");
                         if (!string.IsNullOrEmpty(path))
                         {
                             _currentPath = path;
-                            SettingsService.Current.LastOpenedPath = path;
+                            AppSettingsService.Current.LastOpenedPath = path;
                             OnPathSelected?.Invoke(path);
                         }
                     }
@@ -53,7 +54,7 @@ namespace JackTheRipper360.Editor.Panels
                 if (GUILayout.Button("Open ISO/GOD File", EditorStyles.miniButton))
                 {
                     string file = EditorUtility.OpenFilePanel("Select ISO/GOD",
-                        SettingsService.Current.LastOpenedPath, "iso");
+                        AppSettingsService.Current.LastOpenedPath, "iso");
                     if (!string.IsNullOrEmpty(file))
                     {
                         _currentPath = file;
@@ -64,7 +65,7 @@ namespace JackTheRipper360.Editor.Panels
                 if (GUILayout.Button("Open STFS Package", EditorStyles.miniButton))
                 {
                     string file = EditorUtility.OpenFilePanel("Select STFS Package",
-                        SettingsService.Current.LastOpenedPath, "");
+                        AppSettingsService.Current.LastOpenedPath, "");
                     if (!string.IsNullOrEmpty(file))
                     {
                         _currentPath = file;
@@ -75,7 +76,7 @@ namespace JackTheRipper360.Editor.Panels
                 if (GUILayout.Button("Open XEX Executable", EditorStyles.miniButton))
                 {
                     string file = EditorUtility.OpenFilePanel("Select XEX",
-                        SettingsService.Current.LastOpenedPath, "xex");
+                        AppSettingsService.Current.LastOpenedPath, "xex");
                     if (!string.IsNullOrEmpty(file))
                     {
                         _currentPath = file;

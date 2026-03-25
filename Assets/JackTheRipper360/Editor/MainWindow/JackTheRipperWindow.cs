@@ -5,6 +5,7 @@ using JackTheRipper360.Core.Common;
 using JackTheRipper360.Core.Discovery;
 using JackTheRipper360.Runtime.Services;
 using JackTheRipper360.Editor.Panels;
+using AppSettingsService = JackTheRipper360.Runtime.Services.SettingsService;
 using JackTheRipper360.Editor.Styles;
 
 namespace JackTheRipper360.Editor.MainWindow
@@ -83,7 +84,7 @@ namespace JackTheRipper360.Editor.MainWindow
             // Enable drag & drop
             wantsMouseMove = true;
 
-            SettingsService.Load();
+            AppSettingsService.Load();
         }
 
         private void OnDisable()
@@ -91,7 +92,7 @@ namespace JackTheRipper360.Editor.MainWindow
             _discoveryService?.CancelScan();
             _preview3DPanel?.Dispose();
             _historyService?.Save();
-            SettingsService.Save();
+            AppSettingsService.Save();
         }
 
         private void OnGUI()
@@ -241,10 +242,10 @@ namespace JackTheRipper360.Editor.MainWindow
 
                 if (GUILayout.Button("Open Folder", EditorStyles.toolbarButton, GUILayout.Width(80)))
                 {
-                    string path = EditorUtility.OpenFolderPanel("Select Xbox 360 Game Folder", SettingsService.Current.LastOpenedPath, "");
+                    string path = EditorUtility.OpenFolderPanel("Select Xbox 360 Game Folder", AppSettingsService.Current.LastOpenedPath, "");
                     if (!string.IsNullOrEmpty(path))
                     {
-                        SettingsService.Current.LastOpenedPath = path;
+                        AppSettingsService.Current.LastOpenedPath = path;
                         _historyService.AddRecentPath(path);
                         StartScan(path);
                     }
@@ -253,11 +254,11 @@ namespace JackTheRipper360.Editor.MainWindow
                 if (GUILayout.Button("Open File", EditorStyles.toolbarButton, GUILayout.Width(70)))
                 {
                     string file = EditorUtility.OpenFilePanel("Select Xbox 360 File",
-                        SettingsService.Current.LastOpenedPath,
+                        AppSettingsService.Current.LastOpenedPath,
                         "iso,xex,xwb,xsb,dds,xpr,bik,wmv,upk");
                     if (!string.IsNullOrEmpty(file))
                     {
-                        SettingsService.Current.LastOpenedPath = System.IO.Path.GetDirectoryName(file);
+                        AppSettingsService.Current.LastOpenedPath = System.IO.Path.GetDirectoryName(file);
                         _historyService.AddRecentPath(file);
                         StartFileScan(file);
                     }
@@ -523,16 +524,16 @@ namespace JackTheRipper360.Editor.MainWindow
             if (_selectedEntry == null) return;
 
             string outputPath = EditorUtility.SaveFilePanel("Export Asset",
-                SettingsService.Current.LastExportPath,
+                AppSettingsService.Current.LastExportPath,
                 _selectedEntry.Name, "");
 
             if (!string.IsNullOrEmpty(outputPath))
             {
-                SettingsService.Current.LastExportPath = System.IO.Path.GetDirectoryName(outputPath);
+                AppSettingsService.Current.LastExportPath = System.IO.Path.GetDirectoryName(outputPath);
                 var result = _exportService.ExportAsset(_selectedEntry, outputPath, new ExportOptions
                 {
                     OutputDirectory = System.IO.Path.GetDirectoryName(outputPath),
-                    OverwriteExisting = SettingsService.Current.OverwriteExisting
+                    OverwriteExisting = AppSettingsService.Current.OverwriteExisting
                 });
 
                 _statusMessage = result.Success
@@ -544,11 +545,11 @@ namespace JackTheRipper360.Editor.MainWindow
         private void ExportAll()
         {
             string outputDir = EditorUtility.OpenFolderPanel("Select Export Directory",
-                SettingsService.Current.LastExportPath, "");
+                AppSettingsService.Current.LastExportPath, "");
 
             if (!string.IsNullOrEmpty(outputDir))
             {
-                SettingsService.Current.LastExportPath = outputDir;
+                AppSettingsService.Current.LastExportPath = outputDir;
                 var entries = _discoveryService.Database.GetAllEntriesFlat();
 
                 _exportService.OnProgress += p =>
@@ -566,8 +567,8 @@ namespace JackTheRipper360.Editor.MainWindow
                 _exportService.BatchExport(entries, outputDir, new ExportOptions
                 {
                     OutputDirectory = outputDir,
-                    OverwriteExisting = SettingsService.Current.OverwriteExisting,
-                    PreserveDirectoryStructure = SettingsService.Current.PreserveDirectoryStructure
+                    OverwriteExisting = AppSettingsService.Current.OverwriteExisting,
+                    PreserveDirectoryStructure = AppSettingsService.Current.PreserveDirectoryStructure
                 });
             }
         }
