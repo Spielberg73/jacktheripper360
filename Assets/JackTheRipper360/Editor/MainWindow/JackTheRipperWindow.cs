@@ -258,7 +258,7 @@ namespace JackTheRipper360.Editor.MainWindow
                 {
                     string file = EditorUtility.OpenFilePanel("Select Xbox 360 File",
                         AppSettingsService.Current.LastOpenedPath,
-                        "iso,xex,xwb,xsb,dds,xpr,bik,wmv,upk");
+                        "iso,xex,xwb,xsb,dds,xpr,bik,wmv,upk,fpg");
                     if (!string.IsNullOrEmpty(file))
                     {
                         AppSettingsService.Current.LastOpenedPath = System.IO.Path.GetDirectoryName(file);

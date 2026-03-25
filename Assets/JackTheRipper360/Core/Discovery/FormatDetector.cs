@@ -105,6 +105,10 @@ namespace JackTheRipper360.Core.Discovery
             if (header[0] == 'S' && header[1] == 'D' && header[2] == 'B' && header[3] == 'K')
                 return new FormatMatch { Type = AssetType.Audio, FormatName = "XACT Sound Bank", Confidence = 1.0f };
 
+            // FPG (Backbone Entertainment Graphics Package) - magic "30GF"
+            if (header[0] == 0x33 && header[1] == 0x30 && header[2] == 0x47 && header[3] == 0x46)
+                return new FormatMatch { Type = AssetType.Container, FormatName = "FPG (Graphics Package)", Confidence = 1.0f };
+
             // Archive formats
             if (header[0] == 'B' && header[1] == 'I' && header[2] == 'G' && header[3] == 'F')
                 return new FormatMatch { Type = AssetType.Archive, FormatName = "BIG Archive", Confidence = 0.9f };
@@ -235,6 +239,7 @@ namespace JackTheRipper360.Core.Discovery
                 // Containers
                 case ".iso": return new FormatMatch { Type = AssetType.Container, FormatName = "ISO", Confidence = 0.7f };
                 case ".xex": return new FormatMatch { Type = AssetType.Executable, FormatName = "XEX", Confidence = 0.8f };
+                case ".fpg": return new FormatMatch { Type = AssetType.Container, FormatName = "FPG (Graphics Package)", Confidence = 0.8f };
 
                 // id Tech formats
                 case ".pak": return new FormatMatch { Type = AssetType.Container, FormatName = "PAK Archive", Confidence = 0.7f };

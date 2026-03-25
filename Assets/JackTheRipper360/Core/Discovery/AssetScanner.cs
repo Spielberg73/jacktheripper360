@@ -28,6 +28,7 @@ namespace JackTheRipper360.Core.Discovery
                 new XdvdfsReader(),
                 new StfsReader(),
                 new XexParser(),
+                new FpgContainerReader(),
                 new GenericArchiveReader(),
                 new UnrealPakReader(),
                 // id Tech containers
