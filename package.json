@@ -1,0 +1,30 @@
+{
+    "name": "com.spielberg73.jacktheripper360",
+    "version": "0.1.0",
+    "displayName": "Jack The Ripper 360 - Xbox Asset Extractor",
+    "description": "Unity toolkit for extracting, converting, and previewing original Xbox game assets (XBE, XPR, XACT, XGR formats) with support for Source Engine VTF/MDL files.",
+    "unity": "2021.3",
+    "keywords": [
+        "xbox",
+        "asset-extraction",
+        "xbe",
+        "xpr",
+        "xact",
+        "source-engine",
+        "vtf",
+        "mdl",
+        "game-preservation"
+    ],
+    "author": {
+        "name": "Spielberg73",
+        "url": "https://github.com/Spielberg73"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Spielberg73/jacktheripper360.git"
+    },
+    "samples": [],
+    "dependencies": {
+        "com.unity.editorcoroutines": "1.0.0"
+    }
+}
