@@ -267,10 +267,9 @@ namespace JackTheRipper360.Core.Discovery
                 case ".unity3d": return new FormatMatch { Type = AssetType.Container, FormatName = "Unity AssetBundle", Confidence = 0.8f };
                 case ".bundle": return new FormatMatch { Type = AssetType.Container, FormatName = "Unity AssetBundle", Confidence = 0.6f };
                 case ".resource": return new FormatMatch { Type = AssetType.Data, FormatName = "Unity Resource", Confidence = 0.5f };
-                case ".resS": return new FormatMatch { Type = AssetType.Data, FormatName = "Unity Streaming Resource", Confidence = 0.5f };
+                case ".ress": return new FormatMatch { Type = AssetType.Data, FormatName = "Unity Streaming Resource", Confidence = 0.5f };
 
-                // Unreal Engine formats
-                case ".pak": return new FormatMatch { Type = AssetType.Container, FormatName = "Unreal PAK", Confidence = 0.8f };
+                // Unreal Engine formats (note: .pak already handled above under id Tech)
                 case ".uasset": return new FormatMatch { Type = AssetType.Container, FormatName = "UAsset", Confidence = 0.8f };
                 case ".umap": return new FormatMatch { Type = AssetType.Container, FormatName = "UMap", Confidence = 0.8f };
                 case ".uexp": return new FormatMatch { Type = AssetType.Data, FormatName = "UExp (Export Data)", Confidence = 0.7f };

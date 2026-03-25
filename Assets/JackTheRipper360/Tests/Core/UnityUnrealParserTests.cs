@@ -281,7 +281,7 @@ namespace JackTheRipper360.Tests.Core
         public void ConversionProfile_DefaultValues()
         {
             var profile = new ConversionProfile();
-            Assert.AreEqual(TargetEngine.Unity, profile.Target);
+            Assert.AreEqual(TargetEngine.Unity, profile.TargetEngine);
             Assert.IsTrue(profile.GenerateMetaFiles);
             Assert.IsTrue(profile.GenerateImportSettings);
             Assert.IsTrue(profile.PreserveDirectoryStructure);
@@ -291,7 +291,7 @@ namespace JackTheRipper360.Tests.Core
         public void EngineReimportConverter_ConvertAsset_NullEntry_ReturnsFailure()
         {
             var converter = new EngineReimportConverter();
-            var profile = new ConversionProfile { Target = TargetEngine.Unity };
+            var profile = new ConversionProfile { TargetEngine = TargetEngine.Unity };
 
             var result = converter.ConvertAsset(null, "/tmp/test_output", profile);
             Assert.IsFalse(result.Success);
@@ -340,9 +340,9 @@ namespace JackTheRipper360.Tests.Core
         [Test]
         public void TargetEngine_HasExpectedValues()
         {
-            Assert.AreEqual(1, (int)TargetEngine.Unity);
-            Assert.AreEqual(2, (int)TargetEngine.UnrealEngine);
-            Assert.AreEqual(3, (int)TargetEngine.Both);
+            Assert.AreEqual(0, (int)TargetEngine.Unity);
+            Assert.AreEqual(1, (int)TargetEngine.UnrealEngine);
+            Assert.AreEqual(2, (int)TargetEngine.Both);
         }
 
         #endregion
