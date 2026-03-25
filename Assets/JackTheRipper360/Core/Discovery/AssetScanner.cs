@@ -209,25 +209,30 @@ namespace JackTheRipper360.Core.Discovery
                         Size = stream.Length,
                         FormatName = info.Format
                     };
-                    containerEntry.Metadata["Title"] = info.Title;
+                    containerEntry.Metadata["Title"] = info.Title ?? "";
                     containerEntry.Metadata["EntryCount"] = info.EntryCount;
 
-                    // Scan entries inside the container
-                    foreach (var entry in reader.GetEntries())
+                    // Copy entries to avoid collection modification during iteration
+                    var entries = new List<ContainerEntry>(reader.GetEntries());
+
+                    foreach (var entry in entries)
                     {
                         if (entry.IsDirectory) continue;
 
                         try
                         {
+                            string safeName = SanitizeName(entry.Name);
+                            string safePath = SanitizeName(entry.Path);
+
                             using (var entryStream = reader.OpenEntry(entry))
                             {
                                 var entryMatch = FormatDetector.Identify(entryStream);
                                 if (entryMatch.Confidence < 0.1f)
-                                    entryMatch = FormatDetector.IdentifyByExtension(entry.Name);
+                                    entryMatch = FormatDetector.IdentifyByExtension(safeName);
 
-                                var assetEntry = new AssetEntry(entry.Name, entryMatch.Type)
+                                var assetEntry = new AssetEntry(safeName, entryMatch.Type)
                                 {
-                                    SourcePath = $"{filePath}:{entry.Path}",
+                                    SourcePath = $"{filePath}|{safePath}",
                                     Offset = entry.Offset,
                                     Size = entry.Size,
                                     FormatName = entryMatch.FormatName
@@ -237,10 +242,10 @@ namespace JackTheRipper360.Core.Discovery
                                 foreach (var parser in _assetParsers)
                                 {
                                     entryStream.Seek(0, SeekOrigin.Begin);
-                                    if (parser.CanParse(entryStream, entry.Name))
+                                    if (parser.CanParse(entryStream, safeName))
                                     {
                                         entryStream.Seek(0, SeekOrigin.Begin);
-                                        var parsed = parser.Parse(entryStream, entry.Name);
+                                        var parsed = parser.Parse(entryStream, safeName);
                                         if (parsed != null)
                                         {
                                             parsed.SourcePath = assetEntry.SourcePath;
@@ -257,7 +262,9 @@ namespace JackTheRipper360.Core.Discovery
                         }
                         catch (Exception ex)
                         {
-                            result.Errors.Add($"{filePath}:{entry.Path}: {ex.Message}");
+                            // Don't spam errors for binary-named entries
+                            if (result.Errors.Count < 50)
+                                result.Errors.Add($"{Path.GetFileName(filePath)}: {ex.Message}");
                         }
                     }
 
@@ -266,6 +273,24 @@ namespace JackTheRipper360.Core.Discovery
                     return;
                 }
             }
+        }
+
+        /// <summary>
+        /// Replace non-printable and path-illegal characters in entry names.
+        /// XEX resources often have binary names that cause path errors.
+        /// </summary>
+        private static string SanitizeName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "unnamed";
+            var chars = name.ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
+            {
+                char c = chars[i];
+                if (c < 32 || c > 126 || c == ':' || c == '<' || c == '>' || c == '"' ||
+                    c == '|' || c == '?' || c == '*')
+                    chars[i] = '_';
+            }
+            return new string(chars).TrimEnd('_', ' ');
         }
     }
 

@@ -503,10 +503,13 @@ namespace JackTheRipper360.Editor.MainWindow
             if (result.Errors.Count > 0)
             {
                 _statusMessage += $" ({result.Errors.Count} warnings)";
-                // Take snapshot to avoid collection modification during iteration
+                // Log first 10 errors to avoid console spam
                 var errors = result.Errors.ToArray();
-                foreach (var err in errors)
-                    UnityEngine.Debug.LogWarning($"[JackTheRipper360] {err}");
+                int logCount = System.Math.Min(errors.Length, 10);
+                for (int i = 0; i < logCount; i++)
+                    UnityEngine.Debug.LogWarning($"[JackTheRipper360] {errors[i]}");
+                if (errors.Length > 10)
+                    UnityEngine.Debug.LogWarning($"[JackTheRipper360] ... and {errors.Length - 10} more warnings (see status bar)");
             }
             Repaint();
         }
