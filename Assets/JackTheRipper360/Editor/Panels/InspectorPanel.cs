@@ -213,7 +213,7 @@ namespace JackTheRipper360.Editor.Panels
                                     var converter = new Core.Plugins.EngineReimportConverter();
                                     var profile = new Core.Plugins.ConversionProfile
                                     {
-                                        Target = (Core.Plugins.TargetEngine)_targetEngineIndex,
+                                        TargetEngine = (Core.Plugins.TargetEngine)_targetEngineIndex,
                                         GenerateMetaFiles = _generateMetaFiles,
                                         GenerateImportSettings = _generateImportSettings,
                                         PreserveDirectoryStructure = _preserveStructure
