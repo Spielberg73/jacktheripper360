@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using JackTheRipper360.Core.Common;
 using JackTheRipper360.Core.Containers;
 using JackTheRipper360.Core.Plugins.Unity;
@@ -94,22 +96,31 @@ namespace JackTheRipper360.Core.Discovery
             int processed = 0;
             foreach (string file in files)
             {
-                try
-                {
-                    ScanFile(file, result);
-                }
-                catch (Exception ex)
-                {
-                    result.Errors.Add($"{file}: {ex.Message}");
-                }
-
-                processed++;
+                // Report BEFORE scanning so UI shows which file is being processed
                 progress?.Report(new ScanProgress
                 {
                     CurrentFile = file,
                     FilesProcessed = processed,
                     TotalFiles = files.Count
                 });
+
+                try
+                {
+                    // Timeout per file: 10 seconds max
+                    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    var task = Task.Run(() => ScanFile(file, result), cts.Token);
+                    if (!task.Wait(10000))
+                    {
+                        result.Errors.Add($"{Path.GetFileName(file)}: Skipped (timeout)");
+                        continue;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    result.Errors.Add($"{Path.GetFileName(file)}: {ex.Message}");
+                }
+
+                processed++;
             }
 
             return result;

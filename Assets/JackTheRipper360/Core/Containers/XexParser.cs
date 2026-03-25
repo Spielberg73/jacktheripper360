@@ -68,9 +68,11 @@ namespace JackTheRipper360.Core.Containers
                 _header.SecurityInfoOffset = reader.ReadUInt32();
                 _header.OptionalHeaderCount = reader.ReadUInt32();
 
-                // Read optional headers
-                for (int i = 0; i < _header.OptionalHeaderCount; i++)
+                // Read optional headers (cap at 256 to prevent loops on corrupt data)
+                uint headerCount = Math.Min(_header.OptionalHeaderCount, 256);
+                for (uint i = 0; i < headerCount; i++)
                 {
+                    if (reader.Position + 8 > reader.Length) break;
                     var optHeader = new XexOptionalHeader
                     {
                         Key = reader.ReadUInt32(),
