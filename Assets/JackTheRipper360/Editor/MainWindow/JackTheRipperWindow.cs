@@ -503,7 +503,9 @@ namespace JackTheRipper360.Editor.MainWindow
             if (result.Errors.Count > 0)
             {
                 _statusMessage += $" ({result.Errors.Count} warnings)";
-                foreach (var err in result.Errors)
+                // Take snapshot to avoid collection modification during iteration
+                var errors = result.Errors.ToArray();
+                foreach (var err in errors)
                     UnityEngine.Debug.LogWarning($"[JackTheRipper360] {err}");
             }
             Repaint();

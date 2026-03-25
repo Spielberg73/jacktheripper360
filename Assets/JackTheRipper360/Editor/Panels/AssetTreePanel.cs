@@ -23,6 +23,11 @@ namespace JackTheRipper360.Editor.Panels
         private AssetEntry _selectedEntry;
         private readonly HashSet<string> _expandedGroups = new HashSet<string>();
 
+        // Cached snapshot to avoid collection modification during OnGUI
+        private List<AssetEntry> _cachedEntries = new List<AssetEntry>();
+        private Dictionary<AssetType, int> _cachedCounts = new Dictionary<AssetType, int>();
+        private int _lastKnownCount;
+
         private readonly string[] _filterOptions = {
             "All", "Textures", "Audio", "Models", "Video", "Animation", "Containers"
         };
@@ -49,18 +54,53 @@ namespace JackTheRipper360.Editor.Panels
 
                 GUILayout.Space(3);
 
-                if (database == null || database.TotalCount == 0)
+                int totalCount = database != null ? database.TotalCount : 0;
+
+                if (database == null || totalCount == 0)
                 {
                     EditorGUILayout.HelpBox("No assets loaded. Open a folder or file to begin.", MessageType.Info);
                     EditorGUILayout.EndVertical();
                     return;
                 }
 
+                // Refresh cached snapshot when database changes
+                if (totalCount != _lastKnownCount)
+                {
+                    _lastKnownCount = totalCount;
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(_searchFilter))
+                            _cachedEntries = new List<AssetEntry>(database.Search(_searchFilter));
+                        else if (_typeFilter != AssetType.Unknown)
+                            _cachedEntries = new List<AssetEntry>(database.GetByType(_typeFilter));
+                        else
+                            _cachedEntries = new List<AssetEntry>(database.GetAllEntries());
+
+                        _cachedCounts = database.GetTypeCounts();
+                    }
+                    catch { /* collection modified - will retry next frame */ }
+                }
+                // Also refresh on filter change
+                else if (Event.current.type == EventType.Layout)
+                {
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(_searchFilter))
+                            _cachedEntries = new List<AssetEntry>(database.Search(_searchFilter));
+                        else if (_typeFilter != AssetType.Unknown)
+                            _cachedEntries = new List<AssetEntry>(database.GetByType(_typeFilter));
+                        else
+                            _cachedEntries = new List<AssetEntry>(database.GetAllEntries());
+
+                        _cachedCounts = database.GetTypeCounts();
+                    }
+                    catch { /* collection modified - will retry next frame */ }
+                }
+
                 // Asset counts
-                var counts = database.GetTypeCounts();
                 EditorGUILayout.BeginHorizontal();
                 {
-                    foreach (var kvp in counts)
+                    foreach (var kvp in _cachedCounts)
                     {
                         var color = JackTheRipperStyles.GetAssetTypeColor(kvp.Key);
                         GUI.color = color;
@@ -73,21 +113,12 @@ namespace JackTheRipper360.Editor.Panels
 
                 GUILayout.Space(3);
 
-                // Asset list
+                // Asset list from cached snapshot (safe to iterate)
                 _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
                 {
-                    IReadOnlyList<AssetEntry> entries;
-
-                    if (!string.IsNullOrEmpty(_searchFilter))
-                        entries = database.Search(_searchFilter);
-                    else if (_typeFilter != AssetType.Unknown)
-                        entries = database.GetByType(_typeFilter);
-                    else
-                        entries = database.GetAllEntries();
-
-                    foreach (var entry in entries)
+                    for (int i = 0; i < _cachedEntries.Count; i++)
                     {
-                        DrawAssetEntry(entry, 0);
+                        DrawAssetEntry(_cachedEntries[i], 0);
                     }
                 }
                 EditorGUILayout.EndScrollView();

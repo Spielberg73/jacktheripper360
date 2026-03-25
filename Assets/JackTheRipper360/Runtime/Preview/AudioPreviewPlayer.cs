@@ -21,7 +21,9 @@ namespace JackTheRipper360.Runtime.Preview
                     var go = new GameObject("AudioPreviewPlayer");
                     go.hideFlags = HideFlags.HideAndDontSave;
                     _instance = go.AddComponent<AudioPreviewPlayer>();
-                    DontDestroyOnLoad(go);
+                    // DontDestroyOnLoad only works in Play mode, not in Editor
+                    if (Application.isPlaying)
+                        DontDestroyOnLoad(go);
                 }
                 return _instance;
             }
