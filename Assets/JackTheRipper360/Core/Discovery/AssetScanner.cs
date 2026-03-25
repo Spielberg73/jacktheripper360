@@ -214,22 +214,35 @@ namespace JackTheRipper360.Core.Discovery
                 containerEntry.Metadata["Title"] = info.Title ?? "";
                 containerEntry.Metadata["EntryCount"] = info.EntryCount;
 
-                // Copy entries to avoid collection modification during iteration
                 var entries = new List<ContainerEntry>(reader.GetEntries());
+                bool isFpg = reader is FpgContainerReader;
 
                 foreach (var entry in entries)
                 {
                     if (entry.IsDirectory) continue;
 
                     string safeName = SanitizeName(entry.Name);
-                    string safePath = SanitizeName(entry.Path);
-                    string sourcePath = $"{filePath}|{safePath}";
+                    string sourcePath = $"{filePath}|{SanitizeName(entry.Path)}";
 
+                    // Fast path: FPG entries are all textures
+                    if (isFpg)
+                    {
+                        containerEntry.Children.Add(new AssetEntry(safeName, AssetType.Texture)
+                        {
+                            SourcePath = sourcePath,
+                            Offset = entry.Offset,
+                            Size = entry.Size,
+                            FormatName = "FPG Texture"
+                        });
+                        result.AssetsFound++;
+                        continue;
+                    }
+
+                    // Generic path: identify and parse each entry
                     try
                     {
                         using (var entryStream = reader.OpenEntry(entry))
                         {
-                            // Skip entries too small to identify
                             if (entryStream == null || entryStream.Length < 4)
                             {
                                 containerEntry.Children.Add(new AssetEntry(safeName, AssetType.Data)
@@ -255,7 +268,6 @@ namespace JackTheRipper360.Core.Discovery
                                 FormatName = entryMatch.FormatName
                             };
 
-                            // Try detailed parsing only if format was recognized
                             if (entryMatch.Confidence >= 0.1f)
                             {
                                 foreach (var parser in _assetParsers)
@@ -276,7 +288,7 @@ namespace JackTheRipper360.Core.Discovery
                                             }
                                         }
                                     }
-                                    catch { /* parser failed - try next */ }
+                                    catch { }
                                 }
                             }
 
