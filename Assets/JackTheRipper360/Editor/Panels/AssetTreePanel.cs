@@ -23,176 +23,205 @@ namespace JackTheRipper360.Editor.Panels
         private AssetEntry _selectedEntry;
         private readonly HashSet<string> _expandedGroups = new HashSet<string>();
 
-        // Cached snapshot to avoid collection modification during OnGUI
-        private List<AssetEntry> _cachedEntries = new List<AssetEntry>();
-        private Dictionary<AssetType, int> _cachedCounts = new Dictionary<AssetType, int>();
-        private int _lastKnownCount;
+        // Stable snapshot - only refreshed between full OnGUI cycles (not between Layout/Repaint)
+        private List<AssetEntry> _snapshot = new List<AssetEntry>();
+        private string _countsSummary = "";
+        private int _snapshotTotal;
+        private bool _needsRefresh = true;
+        private int _lastFilterIndex = -1;
+        private string _lastSearch = "";
 
         private readonly string[] _filterOptions = {
             "All", "Textures", "Audio", "Models", "Video", "Animation", "Containers"
         };
         private int _filterIndex;
 
+        /// <summary>
+        /// Call this from outside OnGUI to trigger a cache refresh on next draw.
+        /// </summary>
+        public void MarkDirty() => _needsRefresh = true;
+
         public void Draw(CoreAssetDatabase database)
         {
+            // Refresh snapshot ONLY during Layout pass to keep Layout/Repaint consistent
+            if (Event.current.type == EventType.Layout)
+                RefreshIfNeeded(database);
+
             EditorGUILayout.BeginVertical("box", GUILayout.ExpandHeight(true));
+
+            EditorGUILayout.LabelField("Assets", EditorStyles.boldLabel);
+
+            // Search bar
+            EditorGUILayout.BeginHorizontal();
+            _searchFilter = EditorGUILayout.TextField(_searchFilter, EditorStyles.toolbarSearchField);
+            if (GUILayout.Button("X", GUILayout.Width(20)))
+                _searchFilter = "";
+            EditorGUILayout.EndHorizontal();
+
+            // Type filter
+            _filterIndex = GUILayout.Toolbar(_filterIndex, _filterOptions, EditorStyles.toolbarButton);
+            _typeFilter = IndexToType(_filterIndex);
+
+            // Detect filter changes for next frame
+            if (_filterIndex != _lastFilterIndex || _searchFilter != _lastSearch)
+                _needsRefresh = true;
+
+            GUILayout.Space(3);
+
+            if (_snapshotTotal == 0)
             {
-                EditorGUILayout.LabelField("Assets", EditorStyles.boldLabel);
-
-                // Search bar
-                EditorGUILayout.BeginHorizontal();
-                {
-                    _searchFilter = EditorGUILayout.TextField(_searchFilter, EditorStyles.toolbarSearchField);
-                    if (GUILayout.Button("X", GUILayout.Width(20)))
-                        _searchFilter = "";
-                }
-                EditorGUILayout.EndHorizontal();
-
-                // Type filter
-                _filterIndex = GUILayout.Toolbar(_filterIndex, _filterOptions, EditorStyles.toolbarButton);
-                _typeFilter = IndexToType(_filterIndex);
+                EditorGUILayout.HelpBox("No assets loaded. Open a folder or file to begin.", MessageType.Info);
+            }
+            else
+            {
+                // Counts summary (single label, no dynamic foreach)
+                if (!string.IsNullOrEmpty(_countsSummary))
+                    EditorGUILayout.LabelField(_countsSummary, EditorStyles.miniLabel);
 
                 GUILayout.Space(3);
 
-                int totalCount = database != null ? database.TotalCount : 0;
-
-                if (database == null || totalCount == 0)
-                {
-                    EditorGUILayout.HelpBox("No assets loaded. Open a folder or file to begin.", MessageType.Info);
-                    EditorGUILayout.EndVertical();
-                    return;
-                }
-
-                // Refresh cached snapshot when database changes
-                if (totalCount != _lastKnownCount)
-                {
-                    _lastKnownCount = totalCount;
-                    try
-                    {
-                        if (!string.IsNullOrEmpty(_searchFilter))
-                            _cachedEntries = new List<AssetEntry>(database.Search(_searchFilter));
-                        else if (_typeFilter != AssetType.Unknown)
-                            _cachedEntries = new List<AssetEntry>(database.GetByType(_typeFilter));
-                        else
-                            _cachedEntries = new List<AssetEntry>(database.GetAllEntries());
-
-                        _cachedCounts = database.GetTypeCounts();
-                    }
-                    catch { /* collection modified - will retry next frame */ }
-                }
-                // Also refresh on filter change
-                else if (Event.current.type == EventType.Layout)
-                {
-                    try
-                    {
-                        if (!string.IsNullOrEmpty(_searchFilter))
-                            _cachedEntries = new List<AssetEntry>(database.Search(_searchFilter));
-                        else if (_typeFilter != AssetType.Unknown)
-                            _cachedEntries = new List<AssetEntry>(database.GetByType(_typeFilter));
-                        else
-                            _cachedEntries = new List<AssetEntry>(database.GetAllEntries());
-
-                        _cachedCounts = database.GetTypeCounts();
-                    }
-                    catch { /* collection modified - will retry next frame */ }
-                }
-
-                // Asset counts
-                EditorGUILayout.BeginHorizontal();
-                {
-                    foreach (var kvp in _cachedCounts)
-                    {
-                        var color = JackTheRipperStyles.GetAssetTypeColor(kvp.Key);
-                        GUI.color = color;
-                        GUILayout.Label($"{JackTheRipperStyles.GetAssetTypeIcon(kvp.Key)} {kvp.Value}",
-                            EditorStyles.miniLabel);
-                    }
-                    GUI.color = Color.white;
-                }
-                EditorGUILayout.EndHorizontal();
-
-                GUILayout.Space(3);
-
-                // Asset list from cached snapshot (safe to iterate)
+                // Asset list from stable snapshot
                 _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
-                {
-                    for (int i = 0; i < _cachedEntries.Count; i++)
-                    {
-                        DrawAssetEntry(_cachedEntries[i], 0);
-                    }
-                }
+                for (int i = 0; i < _snapshot.Count; i++)
+                    DrawAssetEntry(_snapshot[i], 0);
                 EditorGUILayout.EndScrollView();
             }
+
             EditorGUILayout.EndVertical();
+        }
+
+        private void RefreshIfNeeded(CoreAssetDatabase database)
+        {
+            if (database == null)
+            {
+                if (_snapshotTotal != 0)
+                {
+                    _snapshot.Clear();
+                    _countsSummary = "";
+                    _snapshotTotal = 0;
+                }
+                return;
+            }
+
+            int currentTotal = database.TotalCount;
+
+            // Check if refresh needed
+            bool filterChanged = _filterIndex != _lastFilterIndex || _searchFilter != _lastSearch;
+            bool countChanged = currentTotal != _snapshotTotal;
+
+            if (!_needsRefresh && !filterChanged && !countChanged)
+                return;
+
+            _lastFilterIndex = _filterIndex;
+            _lastSearch = _searchFilter;
+            _needsRefresh = false;
+
+            try
+            {
+                // Take snapshot
+                if (!string.IsNullOrEmpty(_searchFilter))
+                    _snapshot = new List<AssetEntry>(database.Search(_searchFilter));
+                else if (_typeFilter != AssetType.Unknown)
+                    _snapshot = new List<AssetEntry>(database.GetByType(_typeFilter));
+                else
+                    _snapshot = new List<AssetEntry>(database.GetAllEntries());
+
+                _snapshotTotal = currentTotal;
+
+                // Build counts summary as a single string
+                var counts = database.GetTypeCounts();
+                var parts = new List<string>();
+                foreach (var kvp in counts)
+                    parts.Add($"{JackTheRipperStyles.GetAssetTypeIcon(kvp.Key)} {kvp.Value}");
+                _countsSummary = string.Join("  ", parts.ToArray());
+            }
+            catch
+            {
+                // Collection was modified during snapshot - retry next frame
+                _needsRefresh = true;
+            }
         }
 
         private void DrawAssetEntry(AssetEntry entry, int indent)
         {
+            if (entry == null) return;
+
             // Apply type filter
             if (_typeFilter != AssetType.Unknown && entry.Type != _typeFilter && entry.Children.Count == 0)
                 return;
 
             EditorGUILayout.BeginHorizontal();
+
+            GUILayout.Space(indent * 15);
+
+            bool isSelected = _selectedEntry == entry;
+            var color = JackTheRipperStyles.GetAssetTypeColor(entry.Type);
+
+            if (isSelected)
+                GUI.backgroundColor = JackTheRipperStyles.SelectedColor;
+
+            string icon = JackTheRipperStyles.GetAssetTypeIcon(entry.Type);
+            string displayName = SanitizeDisplayName(entry.Name);
+
+            if (entry.Children.Count > 0)
             {
-                GUILayout.Space(indent * 15);
+                string key = entry.SourcePath ?? entry.Name;
+                bool expanded = _expandedGroups.Contains(key);
 
-                bool isSelected = _selectedEntry == entry;
-                var color = JackTheRipperStyles.GetAssetTypeColor(entry.Type);
-
-                if (isSelected)
-                    GUI.backgroundColor = JackTheRipperStyles.SelectedColor;
-
-                string icon = JackTheRipperStyles.GetAssetTypeIcon(entry.Type);
-                string label = $"{icon} {entry.Name}";
-
-                if (entry.Children.Count > 0)
+                if (GUILayout.Button($"{(expanded ? "v" : ">")} {icon} {displayName} ({entry.Children.Count})",
+                    EditorStyles.label))
                 {
-                    string key = entry.SourcePath ?? entry.Name;
-                    bool expanded = _expandedGroups.Contains(key);
+                    if (expanded) _expandedGroups.Remove(key);
+                    else _expandedGroups.Add(key);
 
-                    // Foldout
-                    EditorGUILayout.BeginVertical();
-                    if (GUILayout.Button($"{(expanded ? "v" : ">")} {label} ({entry.Children.Count})",
-                        EditorStyles.label))
-                    {
-                        if (expanded) _expandedGroups.Remove(key);
-                        else _expandedGroups.Add(key);
-
-                        _selectedEntry = entry;
-                        OnAssetSelected?.Invoke(entry);
-                    }
-                    EditorGUILayout.EndVertical();
-
-                    GUI.backgroundColor = Color.white;
-                    EditorGUILayout.EndHorizontal();
-
-                    if (expanded)
-                    {
-                        foreach (var child in entry.Children)
-                            DrawAssetEntry(child, indent + 1);
-                    }
-                    return;
-                }
-
-                GUI.color = color;
-                if (GUILayout.Button(label, EditorStyles.label))
-                {
                     _selectedEntry = entry;
                     OnAssetSelected?.Invoke(entry);
                 }
-                GUI.color = Color.white;
-
-                // Size info
-                GUILayout.FlexibleSpace();
-                if (entry.Size > 0)
-                {
-                    string sizeStr = FormatSize(entry.Size);
-                    GUILayout.Label(sizeStr, EditorStyles.miniLabel, GUILayout.Width(60));
-                }
 
                 GUI.backgroundColor = Color.white;
+                EditorGUILayout.EndHorizontal();
+
+                if (expanded)
+                {
+                    // Copy children to avoid modification during iteration
+                    var children = entry.Children;
+                    for (int i = 0; i < children.Count; i++)
+                        DrawAssetEntry(children[i], indent + 1);
+                }
+                return;
             }
+
+            GUI.color = color;
+            if (GUILayout.Button($"{icon} {displayName}", EditorStyles.label))
+            {
+                _selectedEntry = entry;
+                OnAssetSelected?.Invoke(entry);
+            }
+            GUI.color = Color.white;
+
+            // Size info
+            GUILayout.FlexibleSpace();
+            if (entry.Size > 0)
+            {
+                string sizeStr = FormatSize(entry.Size);
+                GUILayout.Label(sizeStr, EditorStyles.miniLabel, GUILayout.Width(60));
+            }
+
+            GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
+        }
+
+        private static string SanitizeDisplayName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "(unnamed)";
+            // Replace non-printable chars with '?'
+            var chars = name.ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
+            {
+                if (chars[i] < 32 || chars[i] > 126)
+                    chars[i] = '?';
+            }
+            return new string(chars);
         }
 
         private AssetType IndexToType(int index)
