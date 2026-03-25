@@ -6,6 +6,7 @@ using UnityEditor;
 using JackTheRipper360.Core.Common;
 using JackTheRipper360.Core.Discovery;
 using JackTheRipper360.Editor.Styles;
+using CoreAssetDatabase = JackTheRipper360.Core.Discovery.AssetDatabase;
 
 namespace JackTheRipper360.Editor.Panels
 {
@@ -27,7 +28,7 @@ namespace JackTheRipper360.Editor.Panels
         };
         private int _filterIndex;
 
-        public void Draw(AssetDatabase database)
+        public void Draw(CoreAssetDatabase database)
         {
             EditorGUILayout.BeginVertical("box", GUILayout.ExpandHeight(true));
             {
