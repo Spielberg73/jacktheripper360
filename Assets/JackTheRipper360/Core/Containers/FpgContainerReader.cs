@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using JackTheRipper360.Core.Common;
 
 namespace JackTheRipper360.Core.Containers
@@ -15,8 +14,6 @@ namespace JackTheRipper360.Core.Containers
     {
         private Stream _stream;
         private readonly List<ContainerEntry> _entries = new List<ContainerEntry>();
-        // Store original (uncompressed) sizes keyed by entry index
-        private readonly List<uint> _originalSizes = new List<uint>();
 
         private const int ENTRY_TABLE_OFFSET = 0x800;
         private const int ENTRY_SIZE = 16;
@@ -29,7 +26,6 @@ namespace JackTheRipper360.Core.Containers
             byte[] magic = new byte[4];
             stream.Read(magic, 0, 4);
 
-            // "30GF"
             return magic[0] == 0x33 && magic[1] == 0x30 &&
                    magic[2] == 0x47 && magic[3] == 0x46;
         }
@@ -38,7 +34,6 @@ namespace JackTheRipper360.Core.Containers
         {
             _stream = stream;
             _entries.Clear();
-            _originalSizes.Clear();
 
             stream.Seek(0, SeekOrigin.Begin);
             byte[] header = new byte[8];
@@ -47,7 +42,6 @@ namespace JackTheRipper360.Core.Containers
             uint entryCount = BitConverter.ToUInt32(header, 4);
             if (entryCount > 10000) entryCount = 10000;
 
-            // Read entry table at offset 0x800
             stream.Seek(ENTRY_TABLE_OFFSET, SeekOrigin.Begin);
             byte[] tableData = new byte[entryCount * ENTRY_SIZE];
             int bytesRead = stream.Read(tableData, 0, tableData.Length);
@@ -62,7 +56,6 @@ namespace JackTheRipper360.Core.Containers
                 uint storedSize = BitConverter.ToUInt32(tableData, off + 8);
                 uint originalSize = BitConverter.ToUInt32(tableData, off + 12);
 
-                // Validate bounds
                 if (dataOffset >= stream.Length || storedSize == 0)
                     continue;
 
@@ -78,9 +71,8 @@ namespace JackTheRipper360.Core.Containers
                     Offset = dataOffset,
                     Size = storedSize,
                     IsDirectory = false,
-                    ParentIndex = -1
+                    ParentIndex = (int)originalSize // store original size here for later use
                 });
-                _originalSizes.Add(originalSize);
             }
 
             return new ContainerInfo
@@ -105,63 +97,12 @@ namespace JackTheRipper360.Core.Containers
 
             long safeSize = Math.Min(entry.Size, available);
 
-            // Find the original size for this entry
-            int idx = _entries.IndexOf(entry);
-            uint originalSize = (idx >= 0 && idx < _originalSizes.Count) ? _originalSizes[idx] : 0;
-
-            // Read the stored data
-            _stream.Seek(entry.Offset, SeekOrigin.Begin);
-            byte[] storedData = new byte[safeSize];
-            int read = _stream.Read(storedData, 0, (int)safeSize);
-            if (read < safeSize)
-                Array.Resize(ref storedData, read);
-
-            // Only try decompression if stored size < original size (data is compressed)
-            if (originalSize > storedSize(entry) && originalSize < 16 * 1024 * 1024)
-            {
-                byte[] decompressed = TryZlibDecompress(storedData);
-                if (decompressed != null)
-                    return new MemoryStream(decompressed);
-            }
-
-            // Return raw data
-            return new MemoryStream(storedData);
-        }
-
-        private uint storedSize(ContainerEntry entry) => (uint)entry.Size;
-
-        /// <summary>
-        /// Try zlib decompression only. No raw deflate fallback (too slow/risky).
-        /// </summary>
-        private byte[] TryZlibDecompress(byte[] data)
-        {
-            if (data.Length < 6) return null;
-
-            // Check for zlib header (0x78 0x01, 0x78 0x5E, 0x78 0x9C, 0x78 0xDA)
-            if (data[0] != 0x78) return null;
-            if (data[1] != 0x01 && data[1] != 0x5E && data[1] != 0x9C && data[1] != 0xDA)
-                return null;
-
-            try
-            {
-                // Skip 2-byte zlib header
-                using (var input = new MemoryStream(data, 2, data.Length - 2))
-                using (var deflate = new DeflateStream(input, CompressionMode.Decompress))
-                using (var output = new MemoryStream())
-                {
-                    deflate.CopyTo(output);
-                    return output.ToArray();
-                }
-            }
-            catch
-            {
-                return null;
-            }
+            // Return a lightweight SubStream - no data copied into memory
+            return new SubStream(_stream, entry.Offset, safeSize);
         }
 
         public void Dispose()
         {
-            // Don't dispose the stream - we don't own it
         }
     }
 }
