@@ -198,80 +198,101 @@ namespace JackTheRipper360.Core.Discovery
             foreach (var reader in _containerReaders)
             {
                 stream.Seek(0, SeekOrigin.Begin);
-                if (reader.CanRead(stream))
+                if (!reader.CanRead(stream))
+                    continue;
+
+                stream.Seek(0, SeekOrigin.Begin);
+                var info = reader.ReadHeader(stream);
+
+                var containerEntry = new AssetEntry(Path.GetFileName(filePath), AssetType.Container)
                 {
-                    stream.Seek(0, SeekOrigin.Begin);
-                    var info = reader.ReadHeader(stream);
+                    SourcePath = filePath,
+                    Size = stream.Length,
+                    FormatName = info.Format
+                };
+                containerEntry.Metadata["Title"] = info.Title ?? "";
+                containerEntry.Metadata["EntryCount"] = info.EntryCount;
 
-                    var containerEntry = new AssetEntry(Path.GetFileName(filePath), AssetType.Container)
+                // Copy entries to avoid collection modification during iteration
+                var entries = new List<ContainerEntry>(reader.GetEntries());
+
+                foreach (var entry in entries)
+                {
+                    if (entry.IsDirectory) continue;
+
+                    string safeName = SanitizeName(entry.Name);
+                    string safePath = SanitizeName(entry.Path);
+                    string sourcePath = $"{filePath}|{safePath}";
+
+                    try
                     {
-                        SourcePath = filePath,
-                        Size = stream.Length,
-                        FormatName = info.Format
-                    };
-                    containerEntry.Metadata["Title"] = info.Title ?? "";
-                    containerEntry.Metadata["EntryCount"] = info.EntryCount;
-
-                    // Copy entries to avoid collection modification during iteration
-                    var entries = new List<ContainerEntry>(reader.GetEntries());
-
-                    foreach (var entry in entries)
-                    {
-                        if (entry.IsDirectory) continue;
-
-                        try
+                        using (var entryStream = reader.OpenEntry(entry))
                         {
-                            string safeName = SanitizeName(entry.Name);
-                            string safePath = SanitizeName(entry.Path);
-
-                            using (var entryStream = reader.OpenEntry(entry))
+                            // Skip entries too small to identify
+                            if (entryStream == null || entryStream.Length < 4)
                             {
-                                var entryMatch = FormatDetector.Identify(entryStream);
-                                if (entryMatch.Confidence < 0.1f)
-                                    entryMatch = FormatDetector.IdentifyByExtension(safeName);
-
-                                var assetEntry = new AssetEntry(safeName, entryMatch.Type)
+                                containerEntry.Children.Add(new AssetEntry(safeName, AssetType.Data)
                                 {
-                                    SourcePath = $"{filePath}|{safePath}",
+                                    SourcePath = sourcePath,
                                     Offset = entry.Offset,
                                     Size = entry.Size,
-                                    FormatName = entryMatch.FormatName
-                                };
+                                    FormatName = "Raw Data"
+                                });
+                                result.AssetsFound++;
+                                continue;
+                            }
 
-                                // Try detailed parsing
+                            var entryMatch = FormatDetector.Identify(entryStream);
+                            if (entryMatch.Confidence < 0.1f)
+                                entryMatch = FormatDetector.IdentifyByExtension(safeName);
+
+                            var assetEntry = new AssetEntry(safeName, entryMatch.Type)
+                            {
+                                SourcePath = sourcePath,
+                                Offset = entry.Offset,
+                                Size = entry.Size,
+                                FormatName = entryMatch.FormatName
+                            };
+
+                            // Try detailed parsing only if format was recognized
+                            if (entryMatch.Confidence >= 0.1f)
+                            {
                                 foreach (var parser in _assetParsers)
                                 {
-                                    entryStream.Seek(0, SeekOrigin.Begin);
-                                    if (parser.CanParse(entryStream, safeName))
+                                    try
                                     {
                                         entryStream.Seek(0, SeekOrigin.Begin);
-                                        var parsed = parser.Parse(entryStream, safeName);
-                                        if (parsed != null)
+                                        if (parser.CanParse(entryStream, safeName))
                                         {
-                                            parsed.SourcePath = assetEntry.SourcePath;
-                                            parsed.Offset = entry.Offset;
-                                            assetEntry = parsed;
-                                            break;
+                                            entryStream.Seek(0, SeekOrigin.Begin);
+                                            var parsed = parser.Parse(entryStream, safeName);
+                                            if (parsed != null)
+                                            {
+                                                parsed.SourcePath = sourcePath;
+                                                parsed.Offset = entry.Offset;
+                                                assetEntry = parsed;
+                                                break;
+                                            }
                                         }
                                     }
+                                    catch { /* parser failed - try next */ }
                                 }
-
-                                containerEntry.Children.Add(assetEntry);
-                                result.AssetsFound++;
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            // Don't spam errors for binary-named entries
-                            if (result.Errors.Count < 50)
-                                result.Errors.Add($"{Path.GetFileName(filePath)}: {ex.Message}");
+
+                            containerEntry.Children.Add(assetEntry);
+                            result.AssetsFound++;
                         }
                     }
-
-                    _database.AddEntry(containerEntry);
-                    result.ContainersFound++;
-                    return;
+                    catch (Exception ex)
+                    {
+                        if (result.Errors.Count < 50)
+                            result.Errors.Add($"{Path.GetFileName(filePath)}: {ex.Message}");
+                    }
                 }
+
+                _database.AddEntry(containerEntry);
+                result.ContainersFound++;
+                return;
             }
         }
 
