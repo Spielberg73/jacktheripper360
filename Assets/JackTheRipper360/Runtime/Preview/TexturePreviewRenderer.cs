@@ -2,6 +2,7 @@
 using System.IO;
 using UnityEngine;
 using JackTheRipper360.Core.Common;
+using CoreTextureFormat = JackTheRipper360.Core.Textures.TextureFormat;
 using JackTheRipper360.Core.Textures;
 
 namespace JackTheRipper360.Runtime.Preview
@@ -21,7 +22,7 @@ namespace JackTheRipper360.Runtime.Preview
 
             int width = (int)entry.Metadata["Width"];
             int height = (int)entry.Metadata["Height"];
-            TextureFormat format = (TextureFormat)entry.Metadata["Format"];
+            CoreTextureFormat format = (CoreTextureFormat)entry.Metadata["Format"];
             int dataOffset = entry.Metadata.ContainsKey("DataOffset") ? (int)entry.Metadata["DataOffset"] : 0;
 
             if (width <= 0 || height <= 0) return null;

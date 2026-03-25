@@ -2,7 +2,7 @@
     "name": "JackTheRipper360.Runtime",
     "rootNamespace": "JackTheRipper360.Runtime",
     "references": [
-        "JackTheRipper360.Core"
+        "GUID:0aa3121438f37fd1ae8d1ab1e12a06ef"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

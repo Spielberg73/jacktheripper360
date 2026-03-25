@@ -2,8 +2,8 @@
     "name": "JackTheRipper360.Editor",
     "rootNamespace": "JackTheRipper360.Editor",
     "references": [
-        "JackTheRipper360.Core",
-        "JackTheRipper360.Runtime"
+        "GUID:0aa3121438f37fd1ae8d1ab1e12a06ef",
+        "GUID:e60452e492e3f1b8a2986e69bea9d05a"
     ],
     "includePlatforms": [
         "Editor"
