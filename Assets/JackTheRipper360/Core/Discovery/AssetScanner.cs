@@ -79,14 +79,14 @@ namespace JackTheRipper360.Core.Discovery
                 return result;
             }
 
-            string[] files;
-            try
+            // Enumerate files safely - Directory.GetFiles with AllDirectories
+            // throws if ANY subdirectory is inaccessible (common on Windows)
+            var files = new List<string>();
+            EnumerateFilesSafe(path, files, result);
+
+            if (files.Count == 0 && result.Errors.Count > 0)
             {
-                files = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
-            }
-            catch (Exception ex)
-            {
-                result.ErrorMessage = $"Error scanning directory: {ex.Message}";
+                result.ErrorMessage = $"No accessible files found. {result.Errors.Count} access errors.";
                 return result;
             }
 
@@ -107,11 +107,34 @@ namespace JackTheRipper360.Core.Discovery
                 {
                     CurrentFile = file,
                     FilesProcessed = processed,
-                    TotalFiles = files.Length
+                    TotalFiles = files.Count
                 });
             }
 
             return result;
+        }
+
+        private void EnumerateFilesSafe(string directory, List<string> files, ScanResult result)
+        {
+            try
+            {
+                foreach (string file in Directory.GetFiles(directory))
+                    files.Add(file);
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add($"Access denied: {directory}: {ex.Message}");
+            }
+
+            try
+            {
+                foreach (string subDir in Directory.GetDirectories(directory))
+                    EnumerateFilesSafe(subDir, files, result);
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add($"Access denied: {directory}: {ex.Message}");
+            }
         }
 
         /// <summary>

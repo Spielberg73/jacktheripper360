@@ -491,9 +491,21 @@ namespace JackTheRipper360.Editor.MainWindow
         private void OnScanComplete(ScanResult result)
         {
             _isScanning = false;
-            _statusMessage = $"Scan complete. Found {result.AssetsFound} assets in {result.ContainersFound} containers.";
+            if (!string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                _statusMessage = $"Scan error: {result.ErrorMessage}";
+                UnityEngine.Debug.LogWarning($"[JackTheRipper360] {result.ErrorMessage}");
+            }
+            else
+            {
+                _statusMessage = $"Scan complete. Found {result.AssetsFound} assets in {result.ContainersFound} containers.";
+            }
             if (result.Errors.Count > 0)
-                _statusMessage += $" ({result.Errors.Count} errors)";
+            {
+                _statusMessage += $" ({result.Errors.Count} warnings)";
+                foreach (var err in result.Errors)
+                    UnityEngine.Debug.LogWarning($"[JackTheRipper360] {err}");
+            }
             Repaint();
         }
 
@@ -501,6 +513,7 @@ namespace JackTheRipper360.Editor.MainWindow
         {
             _isScanning = false;
             _statusMessage = $"Error: {error}";
+            UnityEngine.Debug.LogError($"[JackTheRipper360] Scan error: {error}");
             Repaint();
         }
 

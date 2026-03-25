@@ -95,7 +95,7 @@ namespace JackTheRipper360.Runtime.Services
                 catch (Exception ex)
                 {
                     _isScanning = false;
-                    lock (_resultLock) { _pendingError = ex.Message; }
+                    lock (_resultLock) { _pendingError = $"{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}"; }
                 }
             }, _cts.Token);
         }
