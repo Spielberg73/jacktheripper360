@@ -15,8 +15,9 @@ namespace JackTheRipper360.Core.Containers
     {
         private Stream _stream;
         private readonly List<ContainerEntry> _entries = new List<ContainerEntry>();
+        // Store original (uncompressed) sizes keyed by entry index
+        private readonly List<uint> _originalSizes = new List<uint>();
 
-        private const uint FPG_MAGIC = 0x46473033; // "30GF" as LE uint32
         private const int ENTRY_TABLE_OFFSET = 0x800;
         private const int ENTRY_SIZE = 16;
 
@@ -37,14 +38,13 @@ namespace JackTheRipper360.Core.Containers
         {
             _stream = stream;
             _entries.Clear();
+            _originalSizes.Clear();
 
             stream.Seek(0, SeekOrigin.Begin);
             byte[] header = new byte[8];
             stream.Read(header, 0, 8);
 
             uint entryCount = BitConverter.ToUInt32(header, 4);
-
-            // Sanity check
             if (entryCount > 10000) entryCount = 10000;
 
             // Read entry table at offset 0x800
@@ -55,12 +55,12 @@ namespace JackTheRipper360.Core.Containers
 
             for (int i = 0; i < actualEntries; i++)
             {
-                int offset = i * ENTRY_SIZE;
+                int off = i * ENTRY_SIZE;
 
-                uint hash = BitConverter.ToUInt32(tableData, offset);
-                uint dataOffset = BitConverter.ToUInt32(tableData, offset + 4);
-                uint storedSize = BitConverter.ToUInt32(tableData, offset + 8);
-                uint originalSize = BitConverter.ToUInt32(tableData, offset + 12);
+                uint hash = BitConverter.ToUInt32(tableData, off);
+                uint dataOffset = BitConverter.ToUInt32(tableData, off + 4);
+                uint storedSize = BitConverter.ToUInt32(tableData, off + 8);
+                uint originalSize = BitConverter.ToUInt32(tableData, off + 12);
 
                 // Validate bounds
                 if (dataOffset >= stream.Length || storedSize == 0)
@@ -69,26 +69,24 @@ namespace JackTheRipper360.Core.Containers
                 if (dataOffset + storedSize > stream.Length)
                     storedSize = (uint)(stream.Length - dataOffset);
 
-                string name = $"texture_{i:D3}_0x{hash:X8}";
-
-                // Try to determine if it's a texture by size
-                string formatGuess = GuessTextureFormat(originalSize > 0 ? originalSize : storedSize);
+                string name = $"texture_{_entries.Count:D3}_0x{hash:X8}";
 
                 _entries.Add(new ContainerEntry
                 {
-                    Name = $"{name}.dds",
-                    Path = $"{name}.dds",
+                    Name = name,
+                    Path = name,
                     Offset = dataOffset,
                     Size = storedSize,
                     IsDirectory = false,
                     ParentIndex = -1
                 });
+                _originalSizes.Add(originalSize);
             }
 
             return new ContainerInfo
             {
                 Format = "FPG (Backbone Entertainment Graphics Package)",
-                Title = "FPG Archive",
+                Title = $"FPG Archive ({_entries.Count} textures)",
                 TotalSize = stream.Length,
                 EntryCount = _entries.Count
             };
@@ -107,6 +105,10 @@ namespace JackTheRipper360.Core.Containers
 
             long safeSize = Math.Min(entry.Size, available);
 
+            // Find the original size for this entry
+            int idx = _entries.IndexOf(entry);
+            uint originalSize = (idx >= 0 && idx < _originalSizes.Count) ? _originalSizes[idx] : 0;
+
             // Read the stored data
             _stream.Seek(entry.Offset, SeekOrigin.Begin);
             byte[] storedData = new byte[safeSize];
@@ -114,74 +116,46 @@ namespace JackTheRipper360.Core.Containers
             if (read < safeSize)
                 Array.Resize(ref storedData, read);
 
-            // Try to decompress (zlib/deflate)
-            byte[] decompressed = TryDecompress(storedData);
-            if (decompressed != null)
-                return new MemoryStream(decompressed);
+            // Only try decompression if stored size < original size (data is compressed)
+            if (originalSize > storedSize(entry) && originalSize < 16 * 1024 * 1024)
+            {
+                byte[] decompressed = TryZlibDecompress(storedData);
+                if (decompressed != null)
+                    return new MemoryStream(decompressed);
+            }
 
-            // Return raw data if decompression failed
+            // Return raw data
             return new MemoryStream(storedData);
         }
 
+        private uint storedSize(ContainerEntry entry) => (uint)entry.Size;
+
         /// <summary>
-        /// Try zlib/deflate decompression. Returns null if data is not compressed.
+        /// Try zlib decompression only. No raw deflate fallback (too slow/risky).
         /// </summary>
-        private byte[] TryDecompress(byte[] data)
+        private byte[] TryZlibDecompress(byte[] data)
         {
-            if (data.Length < 2) return null;
+            if (data.Length < 6) return null;
 
             // Check for zlib header (0x78 0x01, 0x78 0x5E, 0x78 0x9C, 0x78 0xDA)
-            bool hasZlibHeader = data[0] == 0x78 &&
-                (data[1] == 0x01 || data[1] == 0x5E || data[1] == 0x9C || data[1] == 0xDA);
+            if (data[0] != 0x78) return null;
+            if (data[1] != 0x01 && data[1] != 0x5E && data[1] != 0x9C && data[1] != 0xDA)
+                return null;
 
-            if (hasZlibHeader)
-            {
-                try
-                {
-                    // Skip 2-byte zlib header
-                    using (var input = new MemoryStream(data, 2, data.Length - 2))
-                    using (var deflate = new DeflateStream(input, CompressionMode.Decompress))
-                    using (var output = new MemoryStream())
-                    {
-                        deflate.CopyTo(output);
-                        return output.ToArray();
-                    }
-                }
-                catch { /* not zlib compressed */ }
-            }
-
-            // Try raw deflate (no header)
             try
             {
-                using (var input = new MemoryStream(data))
+                // Skip 2-byte zlib header
+                using (var input = new MemoryStream(data, 2, data.Length - 2))
                 using (var deflate = new DeflateStream(input, CompressionMode.Decompress))
                 using (var output = new MemoryStream())
                 {
                     deflate.CopyTo(output);
-                    byte[] result = output.ToArray();
-                    // Only accept if decompressed data is larger
-                    if (result.Length > data.Length)
-                        return result;
+                    return output.ToArray();
                 }
             }
-            catch { /* not deflate compressed */ }
-
-            return null;
-        }
-
-        private string GuessTextureFormat(uint size)
-        {
-            // Common Xbox 360 texture sizes for DXT5 (1 byte per pixel)
-            switch (size)
+            catch
             {
-                case 1048576: return "DXT5 1024x1024";
-                case 524288: return "DXT5 512x1024 or 1024x512";
-                case 262144: return "DXT5 512x512";
-                case 131072: return "DXT5 256x512 or 512x256";
-                case 65536: return "DXT5 256x256";
-                case 32768: return "DXT1 256x256 or DXT5 128x256";
-                case 16384: return "DXT1 128x128 or DXT5 128x128";
-                default: return "Unknown";
+                return null;
             }
         }
 
