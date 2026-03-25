@@ -68,16 +68,21 @@ namespace JackTheRipper360.Runtime.Services
 
         /// <summary>
         /// Start scanning a directory asynchronously.
+        /// Cancels any previous scan automatically.
         /// </summary>
         public void StartScan(string path)
         {
+            // Cancel any previous scan
             if (_isScanning)
-            {
-                lock (_resultLock) { _pendingError = "A scan is already in progress."; }
-                return;
-            }
+                CancelScan();
 
             _database.Clear();
+            lock (_resultLock)
+            {
+                _pendingResult = null;
+                _pendingError = null;
+                _pendingProgress = null;
+            }
             _cts = new CancellationTokenSource();
             _isScanning = true;
 
