@@ -112,15 +112,32 @@ namespace JackTheRipper360.Core.Containers
 
         private void ParseResourceInfo(EndianBinaryReader reader, uint offset)
         {
+            if (offset >= reader.Length) return;
+
             reader.Seek(offset);
+            if (reader.Length - offset < 4) return;
+
             uint size = reader.ReadUInt32();
+            if (size < 4) return;
+
             uint numResources = (size - 4) / 16;
+            long streamLength = reader.Length;
 
             for (int i = 0; i < numResources; i++)
             {
+                if (reader.Position + 16 > streamLength) break;
+
                 string name = reader.ReadString(8);
                 uint resourceOffset = reader.ReadUInt32();
                 uint resourceSize = reader.ReadUInt32();
+
+                // Validate bounds - skip entries that point beyond the file
+                if (resourceOffset >= streamLength || resourceSize == 0)
+                    continue;
+
+                // Clamp size to available data
+                if (resourceOffset + resourceSize > streamLength)
+                    resourceSize = (uint)(streamLength - resourceOffset);
 
                 _entries.Add(new ContainerEntry
                 {
@@ -140,7 +157,13 @@ namespace JackTheRipper360.Core.Containers
             if (entry.IsDirectory)
                 throw new InvalidOperationException("Cannot open a directory as a stream.");
 
-            return new SubStream(_stream, entry.Offset, entry.Size);
+            // Validate bounds before creating SubStream
+            long available = _stream.Length - entry.Offset;
+            if (entry.Offset >= _stream.Length || available <= 0)
+                return new MemoryStream(new byte[0]);
+
+            long safeSize = Math.Min(entry.Size, available);
+            return new SubStream(_stream, entry.Offset, safeSize);
         }
 
         public void Dispose()
