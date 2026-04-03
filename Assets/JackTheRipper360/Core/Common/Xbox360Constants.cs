@@ -37,6 +37,17 @@ namespace JackTheRipper360.Core.Common
         public const int STFS_BLOCK_SIZE = 0x1000;
         public const int STFS_HASH_BLOCK_SIZE = 0x1000;
 
+        // ABadAvatar exploit constants
+        public const uint ABADAVATAR_THAW_TITLE_ID = 0x41560855;  // Tony Hawk's American Wasteland
+        public const uint ABADAVATAR_RBB_TITLE_ID = 0x45410914;   // Rock Band Blitz
+        public const ushort ABADAVATAR_KERNEL_VERSION = 17559;     // Target kernel version
+        public const uint ABADAVATAR_STAGE2_LOAD_ADDR = 0x80070000;
+        public const uint ABADAVATAR_STAGE3_LOAD_ADDR = 0x90110000;
+        public const uint ABADAVATAR_HV_SYSCALL = 0x00000061;     // Hypervisor syscall used in race
+        public static readonly byte[] ABADAVATAR_STAGE1_SIGNATURE = { 0x38, 0x60, 0x00, 0x00, 0x7C, 0x63 }; // Stage 1 pivot marker
+        public const int ABADAVATAR_SAVE_HEADER_SIZE = 0x80;
+        public const int ABADAVATAR_PAYLOAD_MAX_SIZE = 0x10000;    // 64 KB max payload
+
         // DDS format constants
         public const uint DDS_HEADER_SIZE = 124;
         public const uint DDSD_CAPS = 0x1;

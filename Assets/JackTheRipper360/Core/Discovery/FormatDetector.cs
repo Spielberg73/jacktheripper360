@@ -36,7 +36,20 @@ namespace JackTheRipper360.Core.Discovery
 
             uint magic32 = (uint)((header[0] << 24) | (header[1] << 16) | (header[2] << 8) | header[3]);
             if (magic32 == Xbox360Constants.STFS_MAGIC_CON || magic32 == Xbox360Constants.STFS_MAGIC_LIVE || magic32 == Xbox360Constants.STFS_MAGIC_PIRS)
+            {
+                // Check if this is an ABadAvatar exploit save (STFS with known exploit title IDs)
+                if (stream.Length > 0x364)
+                {
+                    stream.Seek(0x360, SeekOrigin.Begin);
+                    byte[] tidBytes = new byte[4];
+                    stream.Read(tidBytes, 0, 4);
+                    stream.Position = savedPos;
+                    uint titleId = (uint)((tidBytes[0] << 24) | (tidBytes[1] << 16) | (tidBytes[2] << 8) | tidBytes[3]);
+                    if (titleId == Xbox360Constants.ABADAVATAR_THAW_TITLE_ID || titleId == Xbox360Constants.ABADAVATAR_RBB_TITLE_ID)
+                        return new FormatMatch { Type = AssetType.Exploit, FormatName = "ABadAvatar Save (STFS)", Confidence = 0.95f };
+                }
                 return new FormatMatch { Type = AssetType.Container, FormatName = "STFS", Confidence = 1.0f };
+            }
 
             // Check XDVDFS (need to read at sector 32)
             if (stream.Length > Xbox360Constants.XDVDFS_ROOT_SECTOR * Xbox360Constants.XDVDFS_SECTOR_SIZE + 20)

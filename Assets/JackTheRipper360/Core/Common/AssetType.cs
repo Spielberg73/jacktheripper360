@@ -11,6 +11,7 @@ namespace JackTheRipper360.Core.Common
         Container,
         Archive,
         Executable,
-        Data
+        Data,
+        Exploit
     }
 }

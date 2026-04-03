@@ -30,6 +30,7 @@ namespace JackTheRipper360.Editor.MainWindow
         private HexViewerPanel _hexViewerPanel;
         private Preview3DPanel _preview3DPanel;
         private AssetComparisonPanel _comparisonPanel;
+        private ExploitPanel _exploitPanel;
 
         // State
         private AssetEntry _selectedEntry;
@@ -44,7 +45,7 @@ namespace JackTheRipper360.Editor.MainWindow
         private bool _resizingRight;
 
         // Bottom panel tabs
-        private enum BottomTab { None, HexViewer, Comparison }
+        private enum BottomTab { None, HexViewer, Comparison, Exploit }
         private BottomTab _bottomTab = BottomTab.None;
         private float _bottomPanelHeight = 200f;
         private bool _resizingBottom;
@@ -72,6 +73,7 @@ namespace JackTheRipper360.Editor.MainWindow
             _hexViewerPanel = new HexViewerPanel();
             _preview3DPanel = new Preview3DPanel();
             _comparisonPanel = new AssetComparisonPanel();
+            _exploitPanel = new ExploitPanel();
 
             // Wire events
             _discoveryService.OnProgress += OnScanProgress;
@@ -320,6 +322,10 @@ namespace JackTheRipper360.Editor.MainWindow
                 if (GUILayout.Toggle(cmpActive, "Cmp", EditorStyles.toolbarButton, GUILayout.Width(30)) != cmpActive)
                     _bottomTab = cmpActive ? BottomTab.None : BottomTab.Comparison;
 
+                bool expActive = _bottomTab == BottomTab.Exploit;
+                if (GUILayout.Toggle(expActive, "Exp", EditorStyles.toolbarButton, GUILayout.Width(30)) != expActive)
+                    _bottomTab = expActive ? BottomTab.None : BottomTab.Exploit;
+
                 if (_isScanning)
                 {
                     if (GUILayout.Button("Cancel", EditorStyles.toolbarButton, GUILayout.Width(50)))
@@ -381,6 +387,9 @@ namespace JackTheRipper360.Editor.MainWindow
                         break;
                     case BottomTab.Comparison:
                         _comparisonPanel.Draw();
+                        break;
+                    case BottomTab.Exploit:
+                        _exploitPanel.Draw();
                         break;
                 }
             }

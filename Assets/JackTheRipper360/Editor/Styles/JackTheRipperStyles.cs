@@ -19,6 +19,7 @@ namespace JackTheRipper360.Editor.Styles
         public static readonly Color VideoColor = new Color(0.9f, 0.4f, 0.4f);
         public static readonly Color AnimationColor = new Color(0.8f, 0.8f, 0.3f);
         public static readonly Color ContainerColor = new Color(0.6f, 0.6f, 0.6f);
+        public static readonly Color ExploitColor = new Color(0.9f, 0.3f, 0.5f);
 
         private static GUIStyle _headerStyle;
         private static GUIStyle _panelTitleStyle;
@@ -108,6 +109,7 @@ namespace JackTheRipper360.Editor.Styles
                 case Core.Common.AssetType.Video: return VideoColor;
                 case Core.Common.AssetType.Animation: return AnimationColor;
                 case Core.Common.AssetType.Container: return ContainerColor;
+                case Core.Common.AssetType.Exploit: return ExploitColor;
                 default: return Color.gray;
             }
         }
@@ -127,6 +129,7 @@ namespace JackTheRipper360.Editor.Styles
                 case Core.Common.AssetType.Container: return "[PKG]";
                 case Core.Common.AssetType.Executable: return "[EXE]";
                 case Core.Common.AssetType.Archive: return "[ARC]";
+                case Core.Common.AssetType.Exploit: return "[EXP]";
                 default: return "[???]";
             }
         }
