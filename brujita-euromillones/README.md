@@ -1,11 +1,22 @@
 # Brujita de la Suerte
 
-App web para móvil (PWA) que genera combinaciones al azar para el Euromillones: 5 números del 1 al 50 y 2 estrellas del 1 al 12.
+App para móvil que genera combinaciones al azar para los sorteos de Loterías:
+
+| Sorteo | Combinación |
+|---|---|
+| Euromillones | 5 números (1–50) + 2 estrellas (1–12) |
+| La Primitiva | 6 números (1–49) |
+| Bonoloto | 6 números (1–49) |
+| El Gordo de la Primitiva | 5 números (1–54) + número clave (0–9) |
+| EuroDreams | 6 números (1–40) + 1 sueño (1–5) |
+| Lotería Nacional | número de 5 cifras para buscar un décimo |
+
+Se elige el sorteo en el menú principal. Los sorteos se definen en la lista `GAMES` de `www/app.js`, así que añadir otro es añadir una entrada.
 
 - Brujita y gato animados en SVG/CSS (parpadean, flotan, la cola se mueve).
 - Sonidos generados con Web Audio: campanitas del hechizo, una nota por bola, maullido del gato y risita de la brujita.
 - Toca la bola de cristal o el botón **Lanzar hechizo**. Toca al gato o a la brujita para que reaccionen.
-- Historial de las últimas 10 combinaciones (se guarda en el propio móvil).
+- Historial de las últimas 10 combinaciones de cada sorteo (se guarda en el propio móvil).
 - Botón para copiar o compartir la combinación.
 - Instalable en la pantalla de inicio y funciona sin conexión (manifest + service worker).
 

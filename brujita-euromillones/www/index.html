@@ -6,7 +6,7 @@
 <title>Brujita de la Suerte</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#140b26">
-<meta name="description" content="Una brujita y su gato te dan 5 números y 2 estrellas al azar para el Euromillones.">
+<meta name="description" content="Una brujita y su gato te dan números al azar para Euromillones, Primitiva, Bonoloto, El Gordo, EuroDreams y Lotería Nacional.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -18,7 +18,7 @@
   <header class="top">
     <div class="brand">
       <h1>Brujita de la Suerte</h1>
-      <p class="sub">Euromillones · 5 números <span aria-hidden="true">+</span> 2 estrellas</p>
+      <p class="sub" id="sub">Números al azar para tus sorteos</p>
     </div>
     <button id="soundBtn" class="icon-btn" type="button" aria-pressed="true" aria-label="Silenciar sonidos">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="mute" d="M16 9l5 6M21 9l-5 6"/></svg>
@@ -29,7 +29,7 @@
     <div class="sky" id="sky" aria-hidden="true"></div>
     <div class="moon" aria-hidden="true"></div>
 
-    <div class="bubble" id="bubble" role="status" aria-live="polite">¡Toca la bola de cristal!</div>
+    <div class="bubble" id="bubble" role="status" aria-live="polite">¿A qué sorteo jugamos hoy?</div>
 
     <button class="witch" id="witch" type="button" aria-label="Brujita: tócala para que hable">
       <svg viewBox="0 -24 240 284" aria-hidden="true">
@@ -122,27 +122,41 @@
     <div class="sparks" id="sparks" aria-hidden="true"></div>
   </section>
 
-  <section class="result" aria-labelledby="resTitle">
-    <h2 id="resTitle" class="sr-only">Tu combinación</h2>
-    <div class="balls" id="balls">
-      <span class="ball num">07</span><span class="ball num">14</span><span class="ball num">23</span><span class="ball num">34</span><span class="ball num">46</span>
-      <span class="ball star">03</span><span class="ball star">11</span>
-    </div>
-    <p class="hint" id="hint">Combinación de ejemplo. Lanza el hechizo para una nueva.</p>
-    <div class="actions">
-      <button id="castBtn" class="cast" type="button">Lanzar hechizo</button>
-      <button id="shareBtn" class="ghost" type="button">Copiar</button>
-    </div>
-  </section>
+  <nav class="menu" id="menu" aria-labelledby="menuTitle">
+    <h2 id="menuTitle">Elige un sorteo</h2>
+    <ul class="games" id="games"></ul>
+  </nav>
 
-  <section class="history" aria-labelledby="histTitle">
-    <div class="history-head">
-      <h2 id="histTitle">Hechizos anteriores</h2>
-      <button id="clearBtn" class="link" type="button">Borrar</button>
+  <div class="game" id="game" hidden>
+    <div class="game-head">
+      <button id="backBtn" class="back" type="button" aria-label="Volver a los sorteos">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Sorteos
+      </button>
+      <div class="game-title">
+        <h2 id="gameName">Euromillones</h2>
+        <p id="gameRule">5 números del 1 al 50 + 2 estrellas del 1 al 12</p>
+      </div>
     </div>
-    <ol id="histList"></ol>
-    <p id="histEmpty" class="empty">Aquí aparecerán tus últimas 10 combinaciones.</p>
-  </section>
+
+    <section class="result" aria-label="Tu combinación">
+      <div class="balls" id="balls"></div>
+      <p class="hint" id="hint"></p>
+      <div class="actions">
+        <button id="castBtn" class="cast" type="button">Lanzar hechizo</button>
+        <button id="shareBtn" class="ghost" type="button">Copiar</button>
+      </div>
+    </section>
+
+    <section class="history" aria-labelledby="histTitle">
+      <div class="history-head">
+        <h2 id="histTitle">Hechizos anteriores</h2>
+        <button id="clearBtn" class="link" type="button">Borrar</button>
+      </div>
+      <ol id="histList"></ol>
+      <p id="histEmpty" class="empty">Aquí aparecerán tus últimas 10 combinaciones de este sorteo.</p>
+    </section>
+  </div>
 
   <footer class="note">
     Los números se eligen totalmente al azar y no aumentan tus probabilidades de ganar. Juega con responsabilidad · +18.
