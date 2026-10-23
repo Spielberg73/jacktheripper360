@@ -103,16 +103,16 @@
   /* ---------- Sonidos sintetizados (Web Audio) ---------- */
   let soundOn = store.get("brujita.sound", true);
   let ctx = null;
-  function audio() {
-    if (!soundOn) return null;
+  function getCtx() {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       ctx = new AC();
     }
-    if (ctx.state === "suspended") ctx.resume();
+    if (ctx.state === "suspended" && !document.hidden) ctx.resume();
     return ctx;
   }
+  const audio = () => (soundOn ? getCtx() : null);
   function tone({ freq, type = "sine", start = 0, dur = 0.3, vol = 0.2, slideTo }) {
     const ac = audio(); if (!ac) return;
     const t = ac.currentTime + start;
@@ -179,6 +179,116 @@
   }
   setSound(soundOn);
   soundBtn.addEventListener("click", () => { setSound(!soundOn); if (soundOn) sfx.ball(2); });
+
+  /* ---------- Música mágica: vals de caja de música en re menor, sintetizado en bucle ---------- */
+  const music = (() => {
+    const BEAT = 0.62;                       // ~97 pulsaciones por minuto, compás de 3/4
+    const STEP = BEAT / 2;                   // corcheas: 6 por compás
+    // Acordes (nota grave MIDI, tercera en semitonos): Rem, Sib, Solm, La, Fa
+    const Dm = [50, 3], Bb = [46, 4], Gm = [43, 3], A = [45, 4], F = [41, 4];
+    const CHORDS = [Dm, Bb, Gm, A, Dm, F, Gm, A, Bb, F, Gm, Dm, Bb, Gm, A, Dm];
+    // Melodía por compás: [pulso de inicio, nota MIDI, duración en pulsos]
+    const MELODY = [
+      [[0, 81, 2], [2, 77, 1]], [[0, 77, 2], [2, 74, 1]], [[0, 79, 1], [1, 82, 1], [2, 81, 1]], [[0, 76, 3]],
+      [[0, 74, 1], [1, 77, 1], [2, 81, 1]], [[0, 84, 2], [2, 81, 1]], [[0, 82, 1], [1, 81, 1], [2, 79, 1]], [[0, 76, 2], [2, 73, 1]],
+      [[0, 86, 2], [2, 82, 1]], [[0, 84, 2], [2, 81, 1]], [[0, 82, 1], [1, 79, 1], [2, 74, 1]], [[0, 77, 2], [2, 81, 1]],
+      [[0, 77, 1], [1, 74, 1], [2, 77, 1]], [[0, 79, 1], [1, 82, 1], [2, 86, 1]], [[0, 85, 2], [2, 76, 1]], [[0, 74, 3]],
+    ];
+    const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    let on = store.get("brujita.music", true);
+    let bus = null, timer = null, nextTime = 0, step = 0;
+
+    function bell(ac, m, t, dur, vol) { // caja de música: seno + parcial agudo que se apaga antes
+      [[1, vol], [3.01, vol * 0.18]].forEach(([mult, v]) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = "sine"; o.frequency.value = hz(m) * mult;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(v, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + (mult > 1 ? dur * 0.4 : dur));
+        o.connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.05);
+      });
+    }
+    function pad(ac, [root, third], t, dur) { // colchón suave del acorde
+      const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 900;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.035, t + 0.5);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.3);
+      f.connect(g).connect(bus);
+      [root + 12, root + 12 + third, root + 19].forEach((m, i) => {
+        const o = ac.createOscillator();
+        o.type = "triangle"; o.frequency.value = hz(m); o.detune.value = i % 2 ? 6 : -6;
+        o.connect(f); o.start(t); o.stop(t + dur + 0.4);
+      });
+    }
+    function bass(ac, m, t) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = "sine"; o.frequency.value = hz(m);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + BEAT * 2.5);
+      o.connect(g).connect(bus); o.start(t); o.stop(t + BEAT * 2.6);
+    }
+    function schedule(ac, t, s) {
+      const bar = Math.floor(s / 6) % CHORDS.length, pos = s % 6;
+      const [root, third] = CHORDS[bar];
+      if (pos === 0) { bass(ac, root, t); pad(ac, CHORDS[bar], t, BEAT * 3); }
+      const arp = [root + 24, root + 24 + third, root + 31, root + 36, root + 31, root + 24 + third];
+      bell(ac, arp[pos], t, 0.9, 0.035);
+      MELODY[bar].forEach(([beat, m, len]) => { if (beat * 2 === pos) bell(ac, m, t, BEAT * len + 0.6, 0.09); });
+      if (pos === 3 && bar % 4 === 3) bell(ac, root + 48, t + STEP / 2, 1.2, 0.025); // destello
+    }
+    function tick() {
+      const ac = getCtx(); if (!ac || ac.state !== "running") return;
+      if (nextTime < ac.currentTime) nextTime = ac.currentTime + 0.05;
+      while (nextTime < ac.currentTime + 0.4) { schedule(ac, nextTime, step); nextTime += STEP; step++; }
+    }
+    function start() {
+      const ac = getCtx(); if (!ac || timer) return;
+      if (!bus) { bus = ac.createGain(); bus.connect(ac.destination); }
+      bus.gain.cancelScheduledValues(ac.currentTime);
+      bus.gain.setValueAtTime(0.0001, ac.currentTime);
+      bus.gain.exponentialRampToValueAtTime(0.6, ac.currentTime + 1.5);
+      nextTime = ac.currentTime + 0.1;
+      timer = setInterval(tick, 80); tick();
+    }
+    function stop() {
+      if (!timer) return;
+      clearInterval(timer); timer = null;
+      const t = ctx.currentTime;
+      bus.gain.cancelScheduledValues(t);
+      bus.gain.setValueAtTime(bus.gain.value, t);
+      bus.gain.linearRampToValueAtTime(0.0001, t + 0.4);
+    }
+    function duck(down) { // baja la música mientras suena el hechizo
+      if (!bus || !timer) return;
+      const t = ctx.currentTime;
+      bus.gain.cancelScheduledValues(t);
+      bus.gain.setValueAtTime(Math.max(bus.gain.value, 0.0001), t);
+      bus.gain.linearRampToValueAtTime(down ? 0.2 : 0.6, t + (down ? 0.3 : 1.2));
+    }
+    return {
+      get on() { return on; },
+      set(v) { on = v; store.set("brujita.music", v); if (v) start(); else stop(); },
+      resume() { if (on) start(); },
+      stop, duck,
+    };
+  })();
+
+  const musicBtn = $("musicBtn");
+  function syncMusicBtn() {
+    musicBtn.setAttribute("aria-pressed", String(music.on));
+    musicBtn.setAttribute("aria-label", music.on ? "Quitar música" : "Poner música");
+  }
+  syncMusicBtn();
+  musicBtn.addEventListener("click", () => { music.set(!music.on); syncMusicBtn(); });
+  // El navegador solo deja sonar audio tras el primer toque.
+  document.addEventListener("pointerdown", () => music.resume(), { once: true });
+  document.addEventListener("visibilitychange", () => {
+    if (!ctx) return;
+    if (document.hidden) { music.stop(); ctx.suspend(); }
+    else { ctx.resume().then(() => music.resume()); }
+  });
 
   /* ---------- Decorado: cielo estrellado ---------- */
   const sky = $("sky");
@@ -350,6 +460,7 @@
     say(anyOf(PHRASES));
     hint.textContent = "La bola de cristal está pensando…";
     scene.classList.add("casting");
+    music.duck(true);
     const els = renderBalls(playing, result.v);
     els.forEach((b) => b.classList.add("hidden"));
     sfx.shimmer(); buzz(30);
@@ -368,6 +479,7 @@
     }
 
     scene.classList.remove("casting");
+    music.duck(false);
     sfx.fanfare();
     const list = store.get(histKey(playing.id), []);
     const updated = [result, ...(Array.isArray(list) ? list : [])].slice(0, HISTORY_MAX);

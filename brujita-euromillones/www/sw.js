@@ -1,5 +1,5 @@
 // Caché para que la app funcione sin conexión una vez instalada.
-const CACHE = "brujita-v3";
+const CACHE = "brujita-v4";
 const FILES = ["./", "index.html", "style.css", "app.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "fonts/fonts.css"];
 
 self.addEventListener("install", (e) => {

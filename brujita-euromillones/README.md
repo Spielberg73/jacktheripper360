@@ -14,6 +14,7 @@ App para móvil que genera combinaciones al azar para los sorteos de Loterías:
 Se elige el sorteo en el menú principal. Los sorteos se definen en la lista `GAMES` de `www/app.js`, así que añadir otro es añadir una entrada.
 
 - Brujita y gato animados en SVG/CSS (parpadean, flotan, la cola se mueve).
+- Música de fondo mágica: un vals de caja de música en re menor, sintetizado en bucle (botón con la nota para quitarla).
 - Sonidos generados con Web Audio: campanitas del hechizo, una nota por bola, maullido del gato y risita de la brujita.
 - Toca la bola de cristal o el botón **Lanzar hechizo**. Toca al gato o a la brujita para que reaccionen.
 - Historial de las últimas 10 combinaciones de cada sorteo (se guarda en el propio móvil).
