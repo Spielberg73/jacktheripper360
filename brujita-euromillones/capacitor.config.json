@@ -1,0 +1,10 @@
+{
+  "appId": "com.brujita.suerte",
+  "appName": "Brujita de la Suerte",
+  "webDir": "www",
+  "backgroundColor": "#140b26",
+  "android": {
+    "backgroundColor": "#140b26",
+    "adjustMarginsForEdgeToEdge": "force"
+  }
+}

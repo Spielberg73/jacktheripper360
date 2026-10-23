@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Brujita de la Suerte</string>
+    <string name="title_activity_main">Brujita de la Suerte</string>
+    <string name="package_name">com.brujita.suerte</string>
+    <string name="custom_url_scheme">com.brujita.suerte</string>
+</resources>

@@ -1,0 +1,18 @@
+{
+  "name": "brujita-de-la-suerte",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Números al azar para el Euromillones con una brujita y su gato.",
+  "scripts": {
+    "serve": "python3 -m http.server 8080 -d www",
+    "sync": "cap sync android",
+    "apk": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/core": "^7.6.9"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.6.9"
+  }
+}

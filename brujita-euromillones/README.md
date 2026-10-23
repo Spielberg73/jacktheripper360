@@ -11,11 +11,32 @@ App web para móvil (PWA) que genera combinaciones al azar para el Euromillones:
 
 Los números salen de `crypto.getRandomValues` sin sesgo: son puro azar y no mejoran las probabilidades.
 
-## Probarla
+## Estructura
+
+- `www/`: la app (HTML, CSS, JS, iconos y fuentes locales). Es lo mismo que se ve en el navegador.
+- `android/`: proyecto Android generado con [Capacitor](https://capacitorjs.com) que mete `www/` dentro de una app nativa.
+
+## App de Android (APK)
+
+Requisitos: Node 20+, JDK 21 y el SDK de Android (`ANDROID_HOME`).
 
 ```sh
 cd brujita-euromillones
-python3 -m http.server 8080
+npm ci
+npm run apk   # copia www/ al proyecto Android y compila
 ```
 
-Abre `http://localhost:8080` (o sube la carpeta a GitHub Pages / Netlify para usarla con HTTPS e instalarla en el móvil).
+El APK queda en `android/app/build/outputs/apk/debug/app-debug.apk`. Pásalo al móvil y ábrelo (Android pedirá permitir "instalar apps de origen desconocido").
+
+GitHub Actions también compila el APK en cada cambio de esta carpeta (workflow **Brujita APK**); se descarga desde la pestaña *Actions* → la ejecución → *Artifacts*.
+
+Para publicarla en Google Play hace falta una versión firmada: en Android Studio, *Build → Generate Signed App Bundle*.
+
+## Probarla en el navegador
+
+```sh
+cd brujita-euromillones
+npm run serve
+```
+
+Abre `http://localhost:8080`. Para instalarla como PWA en el móvil, súbela con HTTPS (GitHub Pages, Netlify…).

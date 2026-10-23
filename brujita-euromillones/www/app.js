@@ -263,8 +263,9 @@
     catch { toast(`${current.n.map(pad).join(" ")} ★ ${current.s.map(pad).join(" ")}`); }
   });
 
-  /* ---------- App instalable / sin conexión ---------- */
-  if ("serviceWorker" in navigator && location.protocol === "https:") {
+  /* ---------- App instalable / sin conexión (en la app nativa ya va todo dentro) ---------- */
+  const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if (!isNativeApp && "serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("sw.js").catch(() => { /* no disponible aquí */ });
   }
 })();
