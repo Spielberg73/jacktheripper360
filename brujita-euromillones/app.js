@@ -222,6 +222,8 @@
     renderHistory();
     hint.textContent = `Tus números: ${result.n.map(pad).join(", ")} · Estrellas: ${result.s.map(pad).join(" y ")}`;
     say("¡Aquí tienes tu combinación!");
+    await wait(reduced ? 100 : 700);
+    catMeow(); // el gato da el visto bueno
     castBtn.textContent = "Otro hechizo";
     castBtn.disabled = false;
     casting = false;
@@ -235,10 +237,13 @@
     sfx.giggle();
     witch.classList.remove("giggle"); void witch.offsetWidth; witch.classList.add("giggle");
   });
-  cat.addEventListener("click", () => {
+  function catMeow() {
     sfx.meow(); buzz(20);
-    say(CAT_PHRASES[randInt(CAT_PHRASES.length) - 1]);
     cat.classList.remove("meow"); void cat.offsetWidth; cat.classList.add("meow");
+  }
+  cat.addEventListener("click", () => {
+    catMeow();
+    say(CAT_PHRASES[randInt(CAT_PHRASES.length) - 1]);
   });
 
   /* ---------- Copiar / compartir ---------- */
