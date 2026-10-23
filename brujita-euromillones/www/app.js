@@ -87,6 +87,36 @@
     while (set.size < g.count) set.add(randRange(g.min, g.max));
     return [...set].sort((a, b) => a - b);
   }
+  /* ---------- Modo Trébol: descarta combinaciones que juega mucha gente ----------
+     No cambia la probabilidad de acertar (todas valen lo mismo); si toca, se reparte con menos ganadores. */
+  function isPopular(game, values) {
+    const g = game.groups[0], nums = values[0];
+    if (g.digits) {
+      const s = nums.join("");
+      const dd = +s.slice(0, 2), mm = +s.slice(2, 4);
+      return s === [...s].reverse().join("")                        // capicúa
+        || new Set(nums).size <= 2                                  // 11111, 12121…
+        || (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12)             // parece una fecha (ddmm…)
+        || /(7|13|69|00)$/.test(s)                                  // terminaciones favoritas
+        || /0123|1234|2345|3456|4567|5678|6789|9876|8765|7654|6543|5432|4321|3210/.test(s);
+    }
+    const count = (key) => nums.reduce((m, n) => m.set(key(n), (m.get(key(n)) || 0) + 1), new Map());
+    const most = (m) => Math.max(...m.values());
+    const diffs = nums.slice(1).map((n, i) => n - nums[i]);
+    return nums.filter((n) => n > 31).length < (g.max >= 49 ? 2 : 1) // demasiadas fechas de cumpleaños
+      || diffs.some((d, i) => d === 1 && diffs[i + 1] === 1)       // tres o más seguidos
+      || diffs.every((d) => d === diffs[0])                        // progresión: 5-10-15-20-25
+      || most(count((n) => Math.floor((n - 1) / 10))) >= 4         // casi todos en la misma decena
+      || most(count((n) => n % 10)) >= 3;                          // columnas del boleto (misma terminación)
+  }
+  function drawCombo(game, trebol, avoid = []) {
+    const seen = new Set(avoid.map((h) => JSON.stringify(h.v)));
+    for (let i = 0; i < 2000; i++) {
+      const v = game.groups.map(drawGroup);
+      if (!trebol || (!isPopular(game, v) && !seen.has(JSON.stringify(v)))) return v;
+    }
+    return game.groups.map(drawGroup);
+  }
   const fmt = (g, n) => (g.digits || g.max < 10 ? String(n) : String(n).padStart(2, "0"));
   const describe = (game, values, sep = " · ") =>
     game.groups.map((g, i) => `${g.label}: ${values[i].map((n) => fmt(g, n)).join(g.digits ? "" : sep)}`).join("  |  ");
@@ -317,6 +347,7 @@
       s.style.setProperty("--dy", Math.sin(ang) * dist - 30 + "px");
       if (i % 3 === 0) s.style.background = "#9fb2ff";
       if (i % 4 === 0) s.style.background = "#fff";
+      if (trebolOn && i % 2 === 0) s.style.background = "#6ee07a";
       s.style.animationDelay = (Math.random() * 0.25).toFixed(2) + "s";
       sparks.appendChild(s);
       setTimeout(() => s.remove(), 1400);
@@ -388,6 +419,7 @@
         part.textContent = h.v[gi].map((n) => fmt(g, n)).join(g.digits ? "" : " · ");
         combo.appendChild(part);
       });
+      if (h.k) combo.append(" 🍀");
       const when = document.createElement("time");
       const d = new Date(h.t);
       when.dateTime = d.toISOString();
@@ -448,6 +480,22 @@
     if (id) openGame(id, false); else showMenu();
   });
 
+  /* ---------- Interruptor del Modo Trébol ---------- */
+  const trebolToggle = $("trebolToggle");
+  let trebolOn = store.get("brujita.trebol", false) === true;
+  function setTrebol(on, speak) {
+    trebolOn = on;
+    trebolToggle.checked = on;
+    scene.classList.toggle("trebol", on);
+    store.set("brujita.trebol", on);
+    if (speak) {
+      say(on ? "Modo Trébol: evitaré las combinaciones que juega todo el mundo." : "Vuelvo al azar puro de siempre.");
+      if (on) sfx.star(1); else sfx.tap();
+    }
+  }
+  setTrebol(trebolOn, false);
+  trebolToggle.addEventListener("change", () => setTrebol(trebolToggle.checked, true));
+
   /* ---------- El hechizo ---------- */
   async function cast() {
     if (casting) return;
@@ -455,7 +503,9 @@
     casting = true;
     castBtn.disabled = true;
     const playing = game;
-    const result = { v: playing.groups.map(drawGroup), t: Date.now() };
+    const trebol = trebolOn;
+    const result = { v: drawCombo(playing, trebol, store.get(histKey(playing.id), [])), t: Date.now() };
+    if (trebol) result.k = true;
 
     say(anyOf(PHRASES));
     hint.textContent = "La bola de cristal está pensando…";
@@ -488,11 +538,12 @@
       current = result;
       history = updated;
       renderHistory();
-      hint.textContent = describe(playing, result.v, ", ");
+      hint.textContent = (trebol ? "🍀 " : "") + describe(playing, result.v, ", ");
       castBtn.textContent = "Otro hechizo";
       shareBtn.disabled = false;
     }
-    say(playing.id === "nacional" ? "¡Busca un décimo con este número!" : "¡Aquí tienes tu combinación!");
+    say(trebol ? "¡Combinación de trébol, de las que juega poca gente!"
+      : playing.id === "nacional" ? "¡Busca un décimo con este número!" : "¡Aquí tienes tu combinación!");
     await wait(reduced ? 100 : 700);
     catMeow(); // el gato da el visto bueno
     castBtn.disabled = false;
@@ -525,7 +576,7 @@
   }
   shareBtn.addEventListener("click", async () => {
     if (!current || !game) return;
-    const text = `Mis números de la suerte para ${game.name} 🔮\n` +
+    const text = `Mis números de la suerte para ${game.name} ${current.k ? "🍀 (Modo Trébol)" : "🔮"}\n` +
       game.groups.map((g, i) => `${g.label}: ${current.v[i].map((n) => fmt(g, n)).join(g.digits ? "" : " - ")}`).join("\n");
     if (navigator.share) {
       try { await navigator.share({ title: "Brujita de la Suerte", text }); return; }

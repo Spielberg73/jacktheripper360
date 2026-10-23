@@ -274,7 +274,7 @@ h1 {
   box-shadow: 0 4px 0 #5b3a18, 0 8px 14px rgba(0,0,0,.35);
 }
 .ball.star {
-  position: relative; color: #16197a; padding-top: 6%;
+  position: relative; color: #16197a; padding-top: 3%;
   background: radial-gradient(circle at 35% 30%, #a9c0ff 0 8%, #4f6bff 40%, #1d2bb5 80%, #0f1670);
   box-shadow: 0 0 14px rgba(80, 120, 255, .7), 0 4px 10px rgba(0,0,0,.4);
   isolation: isolate;
@@ -289,6 +289,33 @@ h1 {
 .ball.hidden { opacity: .12; filter: grayscale(1); }
 @keyframes ball-in { from { transform: scale(0) rotate(-200deg); opacity: 0; } }
 .balls.wait .ball { opacity: .35; }
+
+/* Modo Trébol */
+.trebol-switch {
+  display: flex; align-items: flex-start; gap: 12px; cursor: pointer;
+  padding: 12px 14px; border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
+  transition: background .2s, border-color .2s;
+}
+.trebol-switch:has(input:checked) { background: rgba(80, 200, 110, .12); border-color: rgba(110, 224, 122, .45); }
+.trebol-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.trebol-switch .track {
+  flex: none; position: relative; width: 52px; height: 30px; margin-top: 2px; border-radius: 15px;
+  background: rgba(255,255,255,.18); transition: background .2s;
+}
+.trebol-switch .knob {
+  position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 14px;
+  background: var(--ink); filter: grayscale(1); transition: transform .25s cubic-bezier(.3,1.5,.5,1), filter .2s;
+}
+.trebol-switch input:checked + .track { background: #2f9e4a; }
+.trebol-switch input:checked + .track .knob { transform: translateX(22px) rotate(360deg); filter: none; }
+.trebol-switch input:focus-visible + .track { outline: 3px solid var(--gold); outline-offset: 3px; }
+.trebol-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.trebol-text strong { font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; color: var(--ink); }
+.trebol-switch:has(input:checked) strong { color: #8ef09a; }
+.trebol-text small { color: var(--muted); font-size: .8rem; line-height: 1.35; }
+.scene.trebol .orb-glass { filter: hue-rotate(-150deg) saturate(1.1); }
 
 .hint { margin: 0; text-align: center; color: var(--muted); font-size: .92rem; min-height: 1.3em; }
 .actions { display: flex; gap: 10px; }
@@ -341,3 +368,5 @@ h1 {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+.scene.trebol.casting .orb-glass { animation-name: orb-cast-trebol; }
+@keyframes orb-cast-trebol { to { box-shadow: 0 0 50px 20px rgba(120, 230, 140, .8), inset 0 -8px 18px rgba(0,0,0,.3); filter: hue-rotate(-150deg) saturate(1.1) brightness(1.35); } }
