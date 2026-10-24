@@ -18,6 +18,7 @@ Se elige el sorteo en el menú principal. Los sorteos se definen en la lista `GA
 - Sonidos generados con Web Audio: campanitas del hechizo, una nota por bola, maullido del gato y risita de la brujita.
 - Toca la bola de cristal o el botón **Lanzar hechizo**. Toca al gato o a la brujita para que reaccionen.
 - **Modo Trébol 🍀**: sigue siendo azar, pero descarta las combinaciones que juega mucha gente (casi todo fechas del 1 al 31, tres números seguidos, progresiones, muchos en la misma decena o con la misma terminación; en Lotería Nacional, capicúas, fechas y terminaciones como 7, 13, 69 o 00) y las que ya te salieron. No aumenta la probabilidad de acertar: si toca, el premio se reparte con menos ganadores. La regla está en `isPopular()` de `www/app.js`.
+- **Resultados reales 📡** (opcional, necesita internet): muestra el último sorteo de cada juego (menos Lotería Nacional), te dice cuántos números acertó tu combinación anterior y, con el Modo Trébol, descarta combinaciones que compartan 3 o más números con cualquiera de los 10 últimos sorteos. Los datos salen de las hojas públicas de [lotoideas.com](https://www.lotoideas.com) y se guardan 3 horas en el móvil.
 - Historial de las últimas 10 combinaciones de cada sorteo (se guarda en el propio móvil).
 - Botón para copiar o compartir la combinación.
 - Instalable en la pantalla de inicio y funciona sin conexión (manifest + service worker).

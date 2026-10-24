@@ -2,10 +2,12 @@
   "use strict";
 
   /* ---------- Sorteos ---------- */
+  // Resultados reales: hojas públicas de lotoideas.com (CSV con CORS abierto, una fila por sorteo).
+  const SHEETS = "https://docs.google.com/spreadsheets/d/e/";
   // Cada grupo: cuántas bolas, rango, estilo y si se ordenan sin repetir (las cifras de un décimo sí se repiten).
   const GAMES = [
     {
-      id: "euromillones", name: "Euromillones", color: "#ffcd4a",
+      id: "euromillones", name: "Euromillones", results: SHEETS + "2PACX-1vRy91wfK2JteoMi1ZOhGm0D1RKJfDTbEOj6rfnrB6-X7n2Q1nfFwBZBpcivHRdg3pSwxSQgLA3KpW7v/pub?output=csv", color: "#ffcd4a",
       rule: "5 números del 1 al 50 + 2 estrellas del 1 al 12",
       days: "Martes y viernes",
       groups: [
@@ -14,19 +16,19 @@
       ],
     },
     {
-      id: "primitiva", name: "La Primitiva", color: "#3ccf5c",
+      id: "primitiva", name: "La Primitiva", results: SHEETS + "2PACX-1vTov1BuA0nkVGTS48arpPFkc9cG7B40Xi3BfY6iqcWTrMwCBg5b50-WwvnvaR6mxvFHbDBtYFKg5IsJ/pub?gid=1&single=true&output=csv", color: "#3ccf5c",
       rule: "6 números del 1 al 49",
       days: "Lunes, jueves y sábados",
       groups: [{ count: 6, min: 1, max: 49, style: "green", label: "Números" }],
     },
     {
-      id: "bonoloto", name: "Bonoloto", color: "#ff9a3c",
+      id: "bonoloto", name: "Bonoloto", results: SHEETS + "2PACX-1vQALTRaLDFfhXOAQmeONPqmFKm9yOiQ4W97rhWgR41BZ7czFsjK5YktD6fnETKHGB9YUnyQ4XBSbhZx/pub?gid=0&single=true&output=csv", color: "#ff9a3c",
       rule: "6 números del 1 al 49",
       days: "De lunes a sábado",
       groups: [{ count: 6, min: 1, max: 49, style: "orange", label: "Números" }],
     },
     {
-      id: "gordo", name: "El Gordo de la Primitiva", color: "#ff5a5f",
+      id: "gordo", name: "El Gordo de la Primitiva", results: SHEETS + "2PACX-1vRR678qNlN_3p2dAxRG0LULS6EYmBbEmpfVhCEmsYky6eiuEH3o_mCRc4c2_EevPru_3BJfSV0QwpG8/pub?output=csv", color: "#ff5a5f",
       rule: "5 números del 1 al 54 + número clave del 0 al 9",
       days: "Domingos",
       groups: [
@@ -35,7 +37,7 @@
       ],
     },
     {
-      id: "eurodreams", name: "EuroDreams", color: "#b678ff",
+      id: "eurodreams", name: "EuroDreams", results: SHEETS + "2PACX-1vTZzm-CTUj3li4EdfW1ImthPdc0AGIymq8tbuwPiqjW0OL4F1MWO5G6PfPEtNvLJcY8MpJo4apayTip/pub?output=csv", color: "#b678ff",
       rule: "6 números del 1 al 40 + 1 sueño del 1 al 5",
       days: "Lunes y jueves",
       groups: [
@@ -109,11 +111,16 @@
       || most(count((n) => Math.floor((n - 1) / 10))) >= 4         // casi todos en la misma decena
       || most(count((n) => n % 10)) >= 3;                          // columnas del boleto (misma terminación)
   }
-  function drawCombo(game, trebol, avoid = []) {
+  // Mucha gente vuelve a jugar los números de los últimos sorteos: con 3 o más números iguales a
+  // alguno de los RECENT_DRAWS más recientes, la combinación se descarta.
+  const RECENT_DRAWS = 10, MAX_SHARED = 2;
+  const tooCloseToDraws = (values, draws) =>
+    draws.slice(0, RECENT_DRAWS).some((d) => values[0].filter((n) => d.v[0].includes(n)).length > MAX_SHARED);
+  function drawCombo(game, trebol, avoid = [], draws = []) {
     const seen = new Set(avoid.map((h) => JSON.stringify(h.v)));
-    for (let i = 0; i < 2000; i++) {
+    for (let i = 0; i < 4000; i++) {
       const v = game.groups.map(drawGroup);
-      if (!trebol || (!isPopular(game, v) && !seen.has(JSON.stringify(v)))) return v;
+      if (!trebol || (!isPopular(game, v) && !seen.has(JSON.stringify(v)) && !tooCloseToDraws(v, draws))) return v;
     }
     return game.groups.map(drawGroup);
   }
@@ -467,6 +474,7 @@
     }
     shareBtn.disabled = !current;
     renderHistory();
+    renderLastDraw();
     say(`¡Vamos con ${game.name}!`);
     window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
   }
@@ -496,6 +504,98 @@
   setTrebol(trebolOn, false);
   trebolToggle.addEventListener("change", () => setTrebol(trebolToggle.checked, true));
 
+  /* ---------- Resultados reales (opcional, necesita internet) ---------- */
+  const realToggle = $("realToggle"), realSwitch = $("realSwitch"), lastDraw = $("lastDraw");
+  let realOn = store.get("brujita.real", false) === true;
+  const CACHE_MS = 3 * 60 * 60 * 1000;
+  const drawsKey = (id) => "brujita.draws." + id;
+  const loading = new Map();
+
+  function parseCsv(game, text) {
+    const draws = [];
+    for (const line of text.split(/\r?\n/)) {
+      const cells = line.split(",").map((c) => c.trim());
+      const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(cells[0]);
+      if (!m) continue;
+      const nums = cells.slice(1).filter((c) => /^\d+$/.test(c)).map(Number);
+      let i = 0;
+      const v = game.groups.map((g) => nums.slice(i, (i += g.count)));
+      const ok = v.every((vals, gi) => vals.length === game.groups[gi].count
+        && vals.every((n) => n >= game.groups[gi].min && n <= game.groups[gi].max));
+      if (ok) draws.push({ d: `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`, v });
+    }
+    return draws.sort((x, y) => (x.d < y.d ? 1 : -1)).slice(0, 30);
+  }
+  // Devuelve los últimos sorteos (más reciente primero), de caché si son recientes.
+  async function loadDraws(game, force) {
+    if (!game.results) return null;
+    const cached = store.get(drawsKey(game.id), null);
+    if (cached && !force && Date.now() - cached.at < CACHE_MS) return cached.draws;
+    if (!loading.has(game.id)) {
+      loading.set(game.id, (async () => {
+        try {
+          const ctl = new AbortController();
+          const timer = setTimeout(() => ctl.abort(), 12000);
+          const res = await fetch(game.results, { signal: ctl.signal, cache: "no-store" });
+          clearTimeout(timer);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const draws = parseCsv(game, await res.text());
+          if (!draws.length) throw new Error("sin datos");
+          store.set(drawsKey(game.id), { at: Date.now(), draws });
+          return draws;
+        } catch (err) {
+          if (cached) return cached.draws; // sin conexión: lo último que tengamos
+          throw err;
+        } finally { loading.delete(game.id); }
+      })());
+    }
+    return loading.get(game.id);
+  }
+
+  const drawDate = (d) => new Date(d + "T21:30:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+  function hitsText(game, combo, draw) {
+    const parts = game.groups.map((g, gi) => {
+      const n = combo.v[gi].filter((x) => draw.v[gi].includes(x)).length;
+      if (gi === 0) return `${n} ${n === 1 ? "número" : "números"}`;
+      return n ? `${g.label.toLowerCase()} ✓` : "";
+    }).filter(Boolean);
+    return parts.join(" + ");
+  }
+  function renderLastDraw() {
+    const g = game;
+    realSwitch.hidden = !g || !g.results;
+    if (!g || !g.results || !realOn) { lastDraw.hidden = true; return; }
+    lastDraw.hidden = false;
+    const status = $("ldStatus"), box = $("ldBalls"), date = $("ldDate");
+    const cached = store.get(drawsKey(g.id), null);
+    const paint = (draws) => {
+      if (game !== g) return;
+      const last = draws[0];
+      date.textContent = drawDate(last.d);
+      box.innerHTML = "";
+      g.groups.forEach((grp, gi) => last.v[gi].forEach((n) => box.appendChild(ballEl(grp, n))));
+      const mine = current && current.t < new Date(last.d + "T21:30:00").getTime()
+        && current.t > new Date(last.d + "T21:30:00").getTime() - 8 * 86400000 ? current : null;
+      status.textContent = mine
+        ? `Tu combinación anterior acertó ${hitsText(g, mine, last)}.`
+        : `Con el Modo Trébol se evitan las combinaciones que se parecen a los últimos ${Math.min(RECENT_DRAWS, draws.length)} sorteos.`;
+    };
+    if (cached) paint(cached.draws);
+    else { date.textContent = ""; box.innerHTML = ""; status.textContent = "Consultando resultados…"; }
+    loadDraws(g).then(paint).catch(() => {
+      if (game === g && !cached) status.textContent = "No se pudieron descargar los resultados. Revisa la conexión a internet.";
+    });
+  }
+  function setReal(on, speak) {
+    realOn = on;
+    realToggle.checked = on;
+    store.set("brujita.real", on);
+    renderLastDraw();
+    if (speak) { say(on ? "Miraré en mi bola los últimos sorteos de verdad." : "Vale, nada de mirar resultados."); sfx.tap(); }
+  }
+  setReal(realOn, false);
+  realToggle.addEventListener("change", () => setReal(realToggle.checked, true));
+
   /* ---------- El hechizo ---------- */
   async function cast() {
     if (casting) return;
@@ -504,7 +604,9 @@
     castBtn.disabled = true;
     const playing = game;
     const trebol = trebolOn;
-    const result = { v: drawCombo(playing, trebol, store.get(histKey(playing.id), [])), t: Date.now() };
+    // Con caché es inmediato; si hay que descargar, no se hace esperar más de 4 s.
+    const draws = realOn ? (await Promise.race([loadDraws(playing).catch(() => null), wait(4000)])) || [] : [];
+    const result = { v: drawCombo(playing, trebol, store.get(histKey(playing.id), []), draws), t: Date.now() };
     if (trebol) result.k = true;
 
     say(anyOf(PHRASES));
@@ -542,7 +644,8 @@
       castBtn.textContent = "Otro hechizo";
       shareBtn.disabled = false;
     }
-    say(trebol ? "¡Combinación de trébol, de las que juega poca gente!"
+    renderLastDraw();
+    say(trebol ? (draws.length ? "¡Trébol! Nada que ver con los últimos sorteos." : "¡Combinación de trébol, de las que juega poca gente!")
       : playing.id === "nacional" ? "¡Busca un décimo con este número!" : "¡Aquí tienes tu combinación!");
     await wait(reduced ? 100 : 700);
     catMeow(); // el gato da el visto bueno

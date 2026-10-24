@@ -1,6 +1,6 @@
 {
   "name": "brujita-de-la-suerte",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Números al azar para Euromillones, Primitiva, Bonoloto, El Gordo, EuroDreams y Lotería Nacional con una brujita y su gato.",
   "scripts": {

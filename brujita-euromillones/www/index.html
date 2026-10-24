@@ -147,6 +147,10 @@
     <section class="result" aria-label="Tu combinación">
       <div class="balls" id="balls"></div>
       <p class="hint" id="hint"></p>
+      <div class="actions">
+        <button id="castBtn" class="cast" type="button">Lanzar hechizo</button>
+        <button id="shareBtn" class="ghost" type="button">Copiar</button>
+      </div>
       <label class="trebol-switch" for="trebolToggle">
         <input type="checkbox" id="trebolToggle" role="switch">
         <span class="track" aria-hidden="true"><span class="knob">🍀</span></span>
@@ -155,9 +159,18 @@
           <small>Evita las combinaciones que juega mucha gente (fechas, series, patrones). No aumenta la probabilidad de acertar, pero si toca repartes el premio con menos ganadores.</small>
         </span>
       </label>
-      <div class="actions">
-        <button id="castBtn" class="cast" type="button">Lanzar hechizo</button>
-        <button id="shareBtn" class="ghost" type="button">Copiar</button>
+      <label class="trebol-switch real" id="realSwitch" for="realToggle">
+        <input type="checkbox" id="realToggle" role="switch">
+        <span class="track" aria-hidden="true"><span class="knob">📡</span></span>
+        <span class="trebol-text">
+          <strong>Resultados reales</strong>
+          <small>Muestra el último sorteo y, con el Modo Trébol, evita parecerse a los 10 últimos. Necesita internet; datos de lotoideas.com.</small>
+        </span>
+      </label>
+      <div class="last-draw" id="lastDraw" hidden>
+        <div class="ld-head"><strong>Último sorteo</strong><span id="ldDate"></span></div>
+        <div class="ld-balls" id="ldBalls"></div>
+        <p id="ldStatus"></p>
       </div>
     </section>
 

@@ -315,6 +315,22 @@ h1 {
 .trebol-text strong { font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; color: var(--ink); }
 .trebol-switch:has(input:checked) strong { color: #8ef09a; }
 .trebol-text small { color: var(--muted); font-size: .8rem; line-height: 1.35; }
+.trebol-switch.real:has(input:checked) { background: rgba(110, 150, 255, .12); border-color: rgba(140, 170, 255, .45); }
+.trebol-switch.real input:checked + .track { background: #3b5bdb; }
+.trebol-switch.real:has(input:checked) strong { color: #a9c0ff; }
+.last-draw {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px; border-radius: 16px;
+  background: var(--parchment); color: #3b2414;
+  box-shadow: 0 4px 0 rgba(0,0,0,.25);
+}
+.ld-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ld-head strong { font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; }
+.ld-head span { font-size: .85rem; font-weight: 700; opacity: .75; }
+.ld-balls { display: flex; flex-wrap: wrap; gap: 5px; min-height: 32px; }
+.ld-balls .ball { width: 32px; font-size: .85rem; }
+.ld-balls .ball.digit { width: 26px; }
+.last-draw p { margin: 0; font-size: .85rem; line-height: 1.35; }
 .scene.trebol .orb-glass { filter: hue-rotate(-150deg) saturate(1.1); }
 
 .hint { margin: 0; text-align: center; color: var(--muted); font-size: .92rem; min-height: 1.3em; }
