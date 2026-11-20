@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NightDrive Player</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header id="titlebar">
+    <div class="tb-logo"><span class="tb-dot"></span>NIGHTDRIVE <b>PLAYER</b></div>
+    <div class="tb-title" id="tbTitle">—</div>
+    <div class="tb-btns">
+      <button id="tbTop" title="Siempre encima">⇡</button>
+      <button id="tbCompact" title="Modo compacto (solo frontal)">▭</button>
+      <button id="tbMin" title="Minimizar">—</button>
+      <button id="tbMax" title="Maximizar">□</button>
+      <button id="tbClose" class="close" title="Cerrar">✕</button>
+    </div>
+  </header>
+
+  <!-- ================= UNIDAD / FRONTAL ================= -->
+  <section id="unit">
+    <div class="chassis">
+      <div class="slot-area" id="slotArea">
+        <div class="slot-screws"><i></i><i></i><i></i><i></i></div>
+        <div class="slot-label">DISC / USB / DROP FILES</div>
+        <div class="disc-slot" id="discSlot"><span></span></div>
+        <div class="slot-actions">
+          <button class="mbtn" id="slotFiles">AÑADIR ARCHIVOS</button>
+          <button class="mbtn" id="slotFolder">AÑADIR CARPETA</button>
+          <button class="mbtn danger" id="slotEject">▲ EJECT (vaciar)</button>
+          <button class="mbtn" id="slotClose">CERRAR FRONTAL</button>
+        </div>
+      </div>
+
+      <div class="plate" id="plate">
+        <svg class="swoosh" viewBox="0 0 1000 280" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 250 C 260 200, 420 290, 640 230 S 900 170, 1000 196" />
+          <path d="M0 262 C 300 220, 470 300, 700 246 S 920 190, 1000 210" class="thin"/>
+        </svg>
+
+        <!-- izquierda -->
+        <div class="p-left">
+          <button class="key pill k-open" id="kOpen" title="Abrir frontal (añadir música)">OPEN</button>
+          <button class="key round k-src" id="kSrc" title="Fuente / Encender pantalla">SRC<small>OFF</small></button>
+          <div class="knob" id="knob" title="Volumen (rueda / arrastrar)">
+            <div class="knob-ring"></div>
+            <div class="knob-cap"><div class="knob-mark"></div></div>
+          </div>
+          <div class="knob-label">VOLUME · PUSH ⏯</div>
+        </div>
+
+        <!-- centro -->
+        <div class="p-center">
+          <div class="brandrow">
+            <span class="brand">NIGHTDRIVE</span>
+            <span class="model">ND-X2000MP</span>
+            <span class="badges"><b>MP3</b><b>FLAC</b><b>WAV</b><b>OGG</b><em>31-BAND GEQ</em><em>24-BIT DSP</em></span>
+          </div>
+          <div class="display-wrap">
+            <div class="icons" id="icons">
+              <span data-i="play">▶</span><span data-i="pause">❚❚</span>
+              <span data-i="rpt">RPT</span><span data-i="rdm">RDM</span><span data-i="scan">SCAN</span>
+              <span data-i="eq">EQ</span><span data-i="loud">LOUD</span><span data-i="bass">BASS</span>
+              <span class="sp"></span>
+              <span data-i="mode" class="mode" id="iconMode">SPECTRUM</span>
+            </div>
+            <canvas id="display"></canvas>
+            <div class="glass"></div>
+          </div>
+          <div class="keyrow">
+            <button class="key num" data-k="1"><b>1</b><small>RPT</small></button>
+            <button class="key num" data-k="2"><b>2</b><small>RDM</small></button>
+            <button class="key num" data-k="3"><b>3</b><small>SCAN</small></button>
+            <button class="key num" data-k="4"><b>4</b><small>PAUSE</small></button>
+            <button class="key num" data-k="5"><b>5</b><small>-10s</small></button>
+            <button class="key num" data-k="6"><b>6</b><small>+10s</small></button>
+          </div>
+        </div>
+
+        <!-- derecha -->
+        <div class="p-right">
+          <div class="rkeys top">
+            <button class="key pill" id="kDisp" title="Modo de pantalla (D)">DISP</button>
+            <button class="key pill" id="kEq" title="Siguiente preset de EQ">EQ</button>
+          </div>
+          <div class="joy" id="joy">
+            <button class="jb up" data-j="up" title="Lista">▲</button>
+            <button class="jb right" data-j="next" title="Siguiente">▶▶|</button>
+            <button class="jb down" data-j="down" title="Ecualizador">▼</button>
+            <button class="jb left" data-j="prev" title="Anterior">|◀◀</button>
+            <button class="jc" data-j="play" title="Play / Pausa">▶❚❚</button>
+          </div>
+          <div class="rkeys bottom">
+            <button class="key pill" id="kAudio" title="Loudness">AUDIO</button>
+            <button class="key pill" id="kIllumi" title="Cambiar frontal">ILLUMI</button>
+          </div>
+        </div>
+        <div class="gloss"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TRANSPORTE ================= -->
+  <section id="transport">
+    <button class="tbtn" id="tPrev" title="Anterior">⏮</button>
+    <button class="tbtn big" id="tPlay" title="Play/Pausa">▶</button>
+    <button class="tbtn" id="tNext" title="Siguiente">⏭</button>
+    <button class="tbtn" id="tStop" title="Stop">■</button>
+    <span class="ttime" id="tCur">00:00</span>
+    <div class="seek" id="seek"><div class="seek-buf"></div><div class="seek-fill" id="seekFill"></div><div class="seek-thumb" id="seekThumb"></div></div>
+    <span class="ttime" id="tDur">00:00</span>
+    <span class="tvol" id="tVol">VOL 20</span>
+  </section>
+
+  <!-- ================= PESTAÑAS ================= -->
+  <nav id="tabs">
+    <button data-tab="eq" class="on">ECUALIZADOR</button>
+    <button data-tab="list">PLAYLIST <span id="listCount">0</span></button>
+    <button data-tab="skins">FRONTALES</button>
+    <span class="tab-hint">Espacio: play · ←/→: buscar · Ctrl+←/→: pista · ↑/↓: volumen · D: pantalla</span>
+  </nav>
+
+  <section id="panels">
+    <!-- EQ -->
+    <div class="panel on" id="panel-eq">
+      <div class="eq-graph-wrap">
+        <canvas id="eqGraph"></canvas>
+        <div class="eq-graph-hint">Arrastra sobre la gráfica para dibujar la curva</div>
+      </div>
+      <div class="eq-bottom">
+        <div class="faders" id="faders"></div>
+        <div class="eq-side">
+          <div class="eq-presets" id="presets"></div>
+          <div class="eq-ctrls">
+            <label>PREAMP <output id="oPre">0 dB</output><input type="range" id="rPre" min="-12" max="6" step="0.5" value="0"></label>
+            <label>BASS BOOST <output id="oBass">0 dB</output><input type="range" id="rBass" min="0" max="12" step="1" value="0"></label>
+            <label>BALANCE <output id="oBal">C</output><input type="range" id="rBal" min="-1" max="1" step="0.05" value="0"></label>
+            <div class="seg" id="segLoud"><span>LOUDNESS</span><button data-v="0">OFF</button><button data-v="1">LOW</button><button data-v="2">MID</button><button data-v="3">HIGH</button></div>
+            <div class="seg half" id="segBands"><span>BANDAS</span><button data-v="10">10</button><button data-v="31">31</button></div>
+            <div class="seg half" id="segEqOn"><span>EQ</span><button data-v="1">ON</button><button data-v="0">BYPASS</button></div>
+            <div class="eq-save"><button class="mbtn" id="saveC1">GUARDAR → C1</button><button class="mbtn" id="saveC2">GUARDAR → C2</button><button class="mbtn" id="eqReset">RESET</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLAYLIST -->
+    <div class="panel" id="panel-list">
+      <aside class="np">
+        <div class="np-cover" id="npCover"><div class="np-cd"></div><img id="npImg" alt=""></div>
+        <div class="np-title" id="npTitle">Sin pista</div>
+        <div class="np-artist" id="npArtist">—</div>
+        <div class="np-album" id="npAlbum"></div>
+        <div class="np-tech" id="npTech"></div>
+      </aside>
+      <div class="pl">
+        <div class="pl-bar">
+          <button class="mbtn" id="plFiles">+ ARCHIVOS</button>
+          <button class="mbtn" id="plFolder">+ CARPETA</button>
+          <button class="mbtn" id="plRemove">QUITAR</button>
+          <button class="mbtn danger" id="plClear">VACIAR</button>
+          <input type="search" id="plSearch" placeholder="Buscar…">
+        </div>
+        <div class="pl-head"><span>#</span><span>TÍTULO</span><span>ARTISTA</span><span>ÁLBUM</span><span>TIEMPO</span></div>
+        <div class="pl-list" id="plList"></div>
+        <div class="pl-empty" id="plEmpty">Arrastra aquí canciones o carpetas, o pulsa <b>+ ARCHIVOS</b></div>
+      </div>
+    </div>
+
+    <!-- FRONTALES -->
+    <div class="panel" id="panel-skins">
+      <div class="skins" id="skins"></div>
+      <div class="skin-opts">
+        <div class="opt">
+          <span>ILUMINACIÓN DE TECLAS</span>
+          <label class="chk"><input type="checkbox" id="illAuto" checked> Color del frontal</label>
+          <input type="range" id="illHue" min="0" max="359" value="0" class="hue">
+        </div>
+        <div class="opt">
+          <span>COLOR DE PANTALLA</span>
+          <div class="chips" id="dispChips"></div>
+        </div>
+        <div class="opt">
+          <span>DIMMER</span>
+          <input type="range" id="dimmer" min="0.35" max="1" step="0.05" value="1">
+        </div>
+        <div class="opt">
+          <span>ANIMACIÓN DE PANTALLA</span>
+          <div class="chips" id="modeChips"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <input type="file" id="fileInput" multiple accept="audio/*,.flac,.m4a,.opus" hidden>
+  <div id="dropOverlay"><div>SUELTA PARA AÑADIR A LA PLAYLIST</div></div>
+</div>
+
+<script src="audio.js"></script>
+<script src="display.js"></script>
+<script src="eq.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

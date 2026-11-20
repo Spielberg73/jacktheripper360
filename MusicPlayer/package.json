@@ -1,0 +1,41 @@
+{
+  "name": "nightdrive-player",
+  "productName": "NightDrive Player",
+  "version": "1.0.0",
+  "description": "Reproductor de música para Windows con ecualizador gráfico de 31 bandas y frontales estilo autorradio de los 2000",
+  "main": "main.js",
+  "author": "NightDrive",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable",
+    "dist:dir": "electron-builder --win dir"
+  },
+  "dependencies": {
+    "music-metadata": "7.14.0"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "com.nightdrive.player",
+    "productName": "NightDrive Player",
+    "files": ["main.js", "preload.js", "src/**/*", "assets/icon.png", "package.json"],
+    "directories": { "output": "dist", "buildResources": "assets" },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "NightDrive Player"
+    },
+    "portable": { "artifactName": "NightDrive-Player-${version}-portable.exe" },
+    "fileAssociations": [
+      { "ext": ["mp3", "flac", "wav", "ogg", "m4a", "aac", "opus"], "name": "Audio", "role": "Viewer" }
+    ]
+  }
+}
