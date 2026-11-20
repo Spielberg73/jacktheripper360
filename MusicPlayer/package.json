@@ -9,7 +9,8 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis portable",
-    "dist:dir": "electron-builder --win dir"
+    "dist:dir": "electron-builder --win dir",
+    "test": "node test/z80.test.mjs && node test/m68k.test.mjs && node test/make-test-rom.mjs test/ndtest.md && node test/scan.test.mjs test/ndtest.md"
   },
   "dependencies": {
     "music-metadata": "7.14.0"
@@ -21,11 +22,23 @@
   "build": {
     "appId": "com.nightdrive.player",
     "productName": "NightDrive Player",
-    "files": ["main.js", "preload.js", "src/**/*", "assets/icon.png", "package.json"],
-    "directories": { "output": "dist", "buildResources": "assets" },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
     "win": {
       "icon": "assets/icon.png",
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -33,9 +46,25 @@
       "createDesktopShortcut": true,
       "shortcutName": "NightDrive Player"
     },
-    "portable": { "artifactName": "NightDrive-Player-${version}-portable.exe" },
+    "portable": {
+      "artifactName": "NightDrive-Player-${version}-portable.exe"
+    },
     "fileAssociations": [
-      { "ext": ["mp3", "flac", "wav", "ogg", "m4a", "aac", "opus", "vgm", "vgz"], "name": "Audio", "role": "Viewer" }
+      {
+        "ext": [
+          "mp3",
+          "flac",
+          "wav",
+          "ogg",
+          "m4a",
+          "aac",
+          "opus",
+          "vgm",
+          "vgz"
+        ],
+        "name": "Audio",
+        "role": "Viewer"
+      }
     ]
   }
 }

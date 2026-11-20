@@ -31,8 +31,19 @@ Reproductor de música para Windows con aspecto de **autorradio 1‑DIN de los 2
 - Las bandas sonoras en VGM se encuentran, por ejemplo, en vgmrips.net. No incluye ninguna.
 - Limitación: el SSG-EG del YM2612 (lo usan pocos juegos) no está emulado todavía.
 
+**ROMs de Mega Drive (nuevo en 1.2)**
+- Abre una ROM (`.md`, `.gen`, `.bin`, `.smd`, también dentro de un `.zip`) y saca sus canciones como pistas.
+- Emula la consola entera sin vídeo: procesadores **68000** y **Z80** propios, el mapa de memoria, el arbitraje del bus, el VDP (interrupciones), los timers del YM2612 y los mandos.
+- **Cómo encuentra las canciones**: arranca el juego y observa cómo el 68000 le pide la música al driver de sonido del Z80, que la toca al escribir un número en un "buzón" de la RAM del Z80. Guarda el estado de la consola justo antes de esa petición y, desde ahí, prueba los 255 valores posibles y escucha qué hace el driver con cada uno. Si suenan notas en varios canales durante segundos es una canción; si duran poco, un jingle; si no suena nada, lo descarta. Las repetidas se eliminan.
+- El análisis se hace en segundo plano (Web Worker) y se guarda en caché, así que la segunda vez es instantáneo.
+- Funciona con los juegos cuyo driver de sonido corre en el Z80, que son la mayoría. Si el juego toca la música desde el 68000 (por ejemplo, el primer Sonic), o no se encuentra el buzón, se añade una sola pista en **modo libre**, que reproduce el juego tal cual arranca (logo, título, demo).
+- Las canciones se llaman "Track 01", "Track 02"… porque la ROM no guarda sus títulos. Las que se repiten en bucle duran 2:30 con un fundido final.
+- No incluye ninguna ROM. Usa tus propios volcados.
+
 **Reproductor**
-- MP3, FLAC, WAV, OGG, Opus, M4A/AAC, VGM y VGZ.
+- MP3, FLAC, WAV, OGG, Opus, M4A/AAC, VGM, VGZ y ROMs de Mega Drive.
+- **ZIP**: abre los `.zip` y añade todas las canciones que tengan dentro (MP3, FLAC, VGZ, ROMs…).
+- En la playlist: un clic selecciona, doble clic o el botón ▶ de la fila reproduce, y Enter reproduce la selección.
 - Lee las etiquetas y la carátula (título, artista, álbum, duración, códec y bitrate).
 - Playlist con búsqueda, añadir archivos o carpetas (recursivo) y arrastrar y soltar.
 - Teclas multimedia del teclado, barra de progreso en la barra de tareas y modo compacto (solo el frontal).
@@ -67,6 +78,14 @@ npm run dist       :: genera el instalador y la versión portable en MusicPlayer
 
 Además, cada push que toca `MusicPlayer/` lanza el workflow **NightDrive Player (Windows build)** en GitHub Actions. El workflow compila los dos `.exe` y los publica como artefacto (`NightDrive-Player-Windows`).
 
+## Pruebas
+
+```bat
+npm test
+```
+
+Comprueba el Z80 (63 casos) y el 68000 (39 casos) con resultados de la documentación de los fabricantes. Después genera una ROM de Mega Drive original de prueba, con un driver de sonido propio de dos canciones y un jingle. Por último verifica que el escáner encuentra las tres y que la primera nota suena a la frecuencia correcta.
+
 ## Estructura
 
 ```
@@ -81,6 +100,9 @@ MusicPlayer/
     ├── vgm.js        carga de VGM/VGZ y puente con el AudioWorklet
     ├── vgm-worklet.js
     ├── chips/        ym2612.js, sn76489.js y vgm-core.js (reproductor VGM)
+    ├── md/           m68k.js, z80.js, megadrive.js, scan.js y md-player.js (ROMs)
+    ├── rom.js / rom-worker.js   análisis de ROMs en segundo plano
+    ├── zip.js        lector de ZIP
     ├── display.js    pantalla de matriz de puntos y sus animaciones
     ├── eq.js         ecualizador gráfico y analizador
     └── app.js        playlist, reproducción, frontales y controles

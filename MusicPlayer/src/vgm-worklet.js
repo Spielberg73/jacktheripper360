@@ -1,5 +1,6 @@
 // AudioWorklet que reproduce VGM emulando YM2612 + SN76489
 import { VgmPlayer } from './chips/vgm-core.js';
+import { MdPlayer } from './md/md-player.js';
 
 class VgmProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -17,6 +18,18 @@ class VgmProcessor extends AudioWorkletProcessor {
         try {
           const p = new VgmPlayer(sampleRate);
           p.load(new Uint8Array(m.data));
+          this.player = p;
+          this.port.postMessage({ type: 'loaded', id: m.id, duration: p.h.duration });
+        } catch (err) {
+          this.player = null;
+          this.port.postMessage({ type: 'error', id: m.id, message: String(err && err.message || err) });
+        }
+        break;
+      case 'loadMD':
+        this.playing = false;
+        try {
+          const p = new MdPlayer(sampleRate);
+          p.load({ ...m.cfg, rom: new Uint8Array(m.cfg.rom) });
           this.player = p;
           this.port.postMessage({ type: 'loaded', id: m.id, duration: p.h.duration });
         } catch (err) {

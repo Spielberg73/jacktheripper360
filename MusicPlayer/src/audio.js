@@ -207,13 +207,15 @@
       this.active = this.html;
       this.html.src = url;
     }
-    async loadVgm(buf) {
+    _toChip() {
       const v = this._vgm();
       const wasHtml = this.active === this.html;
       this.active = v;
       if (wasHtml) { this.html.pause(); this.html.removeAttribute('src'); this.html.load(); }
-      await v.load(buf);
+      return v;
     }
+    async loadVgm(buf) { await this._toChip().load(buf); }
+    async loadMd(cfg) { await this._toChip().loadMd(cfg); }
   }
 
   window.NDAudio = { AudioEngine, MediaSwitch, PRESETS, interpPoints, ISO31, ISO10 };

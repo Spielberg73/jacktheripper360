@@ -66,13 +66,24 @@
       await this.ready;
       const d = await decompress(buf);
       const copy = d.slice().buffer;
+      return this._send({ type: 'load', data: copy }, [copy]);
+    }
+
+    // ROM de Mega Drive: cfg = { rom: Uint8Array, snapshot, mailbox, value, duration, jingle }
+    async loadMd(cfg) {
+      await this.ready;
+      const rom = cfg.rom.slice().buffer;
+      return this._send({ type: 'loadMD', cfg: { ...cfg, rom } }, [rom]);
+    }
+
+    async _send(msg, transfer) {
       const id = ++this._id;
       this.paused = true;
       this.loaded = false;
       this._t = 0;
       const res = await new Promise((resolve, reject) => {
         this._pending.set(id, { resolve, reject });
-        this.node.port.postMessage({ type: 'load', id, data: copy }, [copy]);
+        this.node.port.postMessage({ ...msg, id }, transfer);
       }).catch(err => { this.dispatchEvent(new Event('error')); throw err; });
       if (id !== this._id) return;
       this.loaded = true;

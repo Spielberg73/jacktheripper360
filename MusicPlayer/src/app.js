@@ -44,7 +44,7 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       try {
-        const out = { ...S, playlist: nd ? tracks.map(t => ({ path: t.path, entry: t.entry, zip: t.zip, tagged: t.tagged, title: t.title, artist: t.artist, album: t.album, duration: t.duration, name: t.name, codec: t.codec, bitrate: t.bitrate, sampleRate: t.sampleRate, system: t.system })) : [] };
+        const out = { ...S, playlist: nd ? tracks.filter(t => !t.scanning).map(t => ({ path: t.path, entry: t.entry, zip: t.zip, tagged: t.tagged, rom: t.rom, title: t.title, artist: t.artist, album: t.album, duration: t.duration, name: t.name, codec: t.codec, bitrate: t.bitrate, sampleRate: t.sampleRate, system: t.system })) : [] };
         out.position = engine.el.currentTime || 0;
         out.current = current;
         localStorage.setItem('nightdrive', JSON.stringify(out));
@@ -230,6 +230,7 @@
   const AUDIO_RE = /\.(mp3|flac|wav|ogg|oga|m4a|aac|opus|webm|mp4)$/i;
   const PLAYABLE_RE = /\.(mp3|flac|wav|ogg|oga|m4a|aac|opus|webm|mp4|vgm|vgz)$/i;
   const isZip = n => window.NDZip.isZip(n);
+  const isRom = n => window.NDRom.isRom(n);
 
   // ---- lectura de bytes (archivo suelto o dentro de un ZIP) ----
   let zipCache = { key: null, bytes: null };
@@ -253,13 +254,16 @@
       if (isZip(name)) {
         try {
           const bytes = await readSource(src);
-          const entries = window.NDZip.list(bytes).filter(e => PLAYABLE_RE.test(e.name))
+          const entries = window.NDZip.list(bytes).filter(e => PLAYABLE_RE.test(e.name) || isRom(e.name))
             .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
           for (const e of entries) {
             const n = basename(e.name);
-            out.push({ id: uid++, ...src, entry: e.name, name: n, zip: name, ...parseName(n), album: name.replace(/\.zip$/i, ''), duration: 0 });
+            if (isRom(n)) out.push(romPlaceholder({ ...src, entry: e.name, zip: name }, n));
+            else out.push({ id: uid++, ...src, entry: e.name, name: n, zip: name, ...parseName(n), album: name.replace(/\.zip$/i, ''), duration: 0 });
           }
         } catch (err) { console.warn(err); display.flash('ERROR ZIP', name.slice(0, 18)); }
+      } else if (isRom(name)) {
+        out.push(romPlaceholder(src, name));
       } else if (PLAYABLE_RE.test(name)) {
         out.push({ id: uid++, ...src, name, ...parseName(name), album: '', duration: 0 });
       }
@@ -280,7 +284,7 @@
       try { await applyVgmInfo(t, await readTrackBytes(t)); } catch { /* VGM dañado */ }
     }
     if (nd) {
-      const normal = fresh.filter(t => !isVgm(t.name) && !t.entry && t.path);
+      const normal = fresh.filter(t => !isVgm(t.name) && !t.entry && t.path && !t.scanning);
       for (let i = 0; i < normal.length; i += 25) {
         const chunk = normal.slice(i, i + 25);
         const tags = await nd.tags(chunk.map(t => t.path));
@@ -292,7 +296,48 @@
     if (tracks[current] && fresh.includes(tracks[current])) updateNowPlaying();
     reshuffle();
     save();
+    for (const ph of fresh.filter(t => t.scanning)) await scanRomTrack(ph);
   }
+
+  // ---- ROMs de Mega Drive: se analizan y se convierten en una pista por canción ----
+  let pendingPlay = null;
+  function romPlaceholder(src, name) {
+    return { id: uid++, ...src, name, title: 'Analizando ROM…', artist: 'Mega Drive', album: name, duration: 0, scanning: true };
+  }
+  function romTrack(src, res, t, i) {
+    const base = { id: uid++, path: src.path, file: src.file, entry: src.entry, zip: src.zip, name: src.name, album: res.title, system: 'Mega Drive', codec: 'ROM · 68000 + Z80 + YM2612 + PSG' };
+    if (!t) return { ...base, title: res.title + ' (modo libre)', artist: 'Arranque del juego', duration: 180, rom: { crc: res.crc, free: true } };
+    const n = String(i + 1).padStart(2, '0');
+    return { ...base, title: (t.kind === 'jingle' ? 'Jingle ' : 'Track ') + n, artist: 'Mega Drive · ID ' + t.value.toString(16).toUpperCase() + 'h',
+      duration: t.kind === 'jingle' ? t.length : 150, rom: { crc: res.crc, mailbox: res.mailbox, frame: res.frame, value: t.value, jingle: t.kind === 'jingle' } };
+  }
+  async function scanRomTrack(ph) {
+    let lastDraw = 0;
+    try {
+      const bytes = await readTrackBytes(ph);
+      const res = await window.NDRom.scan(bytes, p => {
+        ph.title = `Analizando ROM… ${Math.round(p * 100)}%`;
+        const now = performance.now();
+        if (now - lastDraw > 250) { lastDraw = now; renderList(); display.flash('ANALIZANDO ROM', Math.round(p * 100) + '%', 900); }
+      });
+      const idx = tracks.indexOf(ph);
+      if (idx < 0) return;
+      const list = res.mode === 'none' ? [] : res.mode === 'z80' ? res.tracks.map((t, i) => romTrack(ph, res, t, i)) : [romTrack(ph, res, null, 0)];
+      const cur = tracks[current];
+      tracks.splice(idx, 1, ...list);
+      current = cur ? tracks.indexOf(cur) : -1;
+      renderList(); reshuffle(); save();
+      if (res.mode === 'none') display.flash('NO ES UNA ROM', 'DE MEGA DRIVE');
+      else display.flash(res.title.toUpperCase(), res.mode === 'z80' ? `${list.length} CANCIONES` : 'MODO LIBRE', 2500);
+      if (pendingPlay === ph) { pendingPlay = null; if (list.length) playIndex(idx); }
+    } catch (err) {
+      console.error(err);
+      const idx = tracks.indexOf(ph);
+      if (idx >= 0) { tracks.splice(idx, 1); if (current > idx) current--; renderList(); }
+      display.flash('ERROR ROM', String(err.message || err).slice(0, 20).toUpperCase());
+    }
+  }
+
   function applyTags(t, m) {
     if (!m) return;
     if (m.title) t.title = m.title;
@@ -315,7 +360,7 @@
     return addSources(paths.map(p => ({ path: p })), playFirst);
   }
   function addFiles(files, playFirst) {
-    const list = [...files].filter(f => f.type.startsWith('audio') || PLAYABLE_RE.test(f.name) || isZip(f.name));
+    const list = [...files].filter(f => f.type.startsWith('audio') || PLAYABLE_RE.test(f.name) || isZip(f.name) || isRom(f.name));
     if (!list.length) return;
     if (nd) { // en Electron preferimos rutas (persisten entre sesiones)
       const paths = list.map(f => nd.pathForFile(f)).filter(Boolean);
@@ -398,6 +443,12 @@
     try {
       const bytes = await readTrackBytes(t);
       if (seq !== loadSeq) return false;
+      if (t.rom) {
+        const snap = t.rom.free ? null : await window.NDRom.snapshot(bytes, t.rom);
+        if (seq !== loadSeq) return false;
+        await audio.loadMd({ rom: bytes, snapshot: snap, mailbox: t.rom.mailbox, value: t.rom.value, duration: t.duration, jingle: !!t.rom.jingle });
+        return true;
+      }
       if (isVgm(t.name)) {
         await audio.loadVgm(bytes);
         return true;
@@ -424,6 +475,7 @@
   let loadSeq = 0;
   async function playIndex(i, startAt = 0, autoplay = true) {
     if (i < 0 || i >= tracks.length) return;
+    if (tracks[i].scanning) { pendingPlay = tracks[i]; display.flash('ESPERA', 'ANALIZANDO ROM'); return; }
     const seq = ++loadSeq;
     current = i;
     renderList();
@@ -505,7 +557,7 @@
     const st = display.state;
     st.title = t ? t.title : ''; st.artist = t ? [t.artist, t.album].filter(Boolean).join(' / ') : '';
     st.track = current + 1;
-    st.format = t ? (isVgm(t.name) ? 'VGM' : (t.name.split('.').pop() || '').toUpperCase().slice(0, 4)) : '';
+    st.format = t ? (t.rom ? 'ROM' : isVgm(t.name) ? 'VGM' : (t.name.split('.').pop() || '').toUpperCase().slice(0, 4)) : '';
     const title = t ? `${t.artist ? t.artist + ' — ' : ''}${t.title}` : 'NightDrive Player';
     $('#tbTitle').textContent = title;
     document.title = t ? `${t.title} · NightDrive` : 'NightDrive Player';
