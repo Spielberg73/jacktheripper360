@@ -2,7 +2,8 @@
 (function () {
   const W = 256, H = 64;          // resolución en "puntos"
   const GFX_W = 96;               // zona de animación a la izquierda
-  const MODES = ['SPECTRUM', 'LEVEL METER', 'SCOPE', 'SPEAKER', 'TUNNEL', 'FULL SPECTRUM', 'CLOCK', 'FM CHANNELS'];
+  const MODES = ['SPECTRUM', 'LEVEL METER', 'SCOPE', 'SPEAKER', 'TUNNEL', 'FULL SPECTRUM', 'CLOCK', 'FM CHANNELS', 'NIGHT SKY', 'HIGHWAY', 'HARBOR'];
+  const SCENES = new Set(['NIGHT SKY', 'HIGHWAY', 'HARBOR']);
   const FONT = 'bold 12px Consolas, "Lucida Console", "Courier New", monospace';
   const FONT_BIG = 'bold 34px Consolas, "Lucida Console", "Courier New", monospace';
 
@@ -39,6 +40,9 @@
       this.rings = [];
       this.energy = 0;
       this.tunnelZ = 0;
+      this.scenes = window.NDScenes ? new window.NDScenes.Scenes() : null;
+      this.au = { energy: 0, bass: 0, high: 0, kick: false };
+      this.hud = { title: null, at: 0 };
       new ResizeObserver(() => this.resize()).observe(canvas);
       this.resize();
     }
@@ -120,7 +124,13 @@
       this.lvl.pL = Math.max(db(lv.L.peak), this.lvl.pL - 0.008); this.lvl.pR = Math.max(db(lv.R.peak), this.lvl.pR - 0.008);
       let bass = 0; for (let i = 0; i < 4; i++) bass += this.spec16[i];
       bass /= 4;
+      const prevE = this.energy;
       this.energy += (bass - this.energy) * 0.35;
+      let hi = 0; for (let i = 11; i < 16; i++) hi += this.spec16[i];
+      this.au.high += (hi / 5 - this.au.high) * 0.3;
+      this.au.bass = this.energy;
+      this.au.energy += ((this.lvl.L + this.lvl.R) / 2 - this.au.energy) * 0.05;
+      this.au.kick = this.energy - prevE > 0.08;
     }
 
     // ---------- animaciones ----------
@@ -285,7 +295,10 @@
       if (t < 3.0) this.drawIntro(t);
       else {
         const mode = MODES[this.mode];
-        if (mode === 'FULL SPECTRUM') {
+        if (SCENES.has(mode) && this.scenes) {
+          this.scenes.draw(mode, b, this.au);
+          this.sceneHud();
+        } else if (mode === 'FULL SPECTRUM') {
           this.gfxSpectrum(0, W, 64, this.spec64, this.peak64, 1);
           if (this.message && performance.now() < this.message.until) {
             b.clearRect(40, 14, W - 80, 30);
@@ -314,6 +327,25 @@
       this.blit();
     }
 
+    // hora arriba a la derecha y el título al cambiar de canción (y cada 30 s)
+    sceneHud() {
+      const b = this.b, s = this.state, now = performance.now();
+      if (s.title !== this.hud.title) { this.hud.title = s.title; this.hud.at = now; }
+      b.fillStyle = '#fff';
+      if (s.hasDisc) {
+        b.clearRect(W - 38, 0, 38, 13);
+        if (!(!s.playing && Math.floor(now / 500) % 2)) this.text(this.fmt(s.time), W - 2, 1, 'right');
+        const since = (now - this.hud.at) / 1000;
+        if (since < 7 || since % 30 < 6) {
+          b.clearRect(0, 0, 150, 13);
+          b.fillStyle = '#fff';
+          this.scrollText(s.title || '', 2, 1, 146, 'hud' + s.title);
+        }
+      }
+      const msg = this.message && now < this.message.until ? this.message : null;
+      if (msg) { b.clearRect(56, 20, W - 112, 22); b.fillStyle = '#fff'; this.text(msg.text, W / 2, 25, 'center'); }
+    }
+
     blit() {
       const img = this.b.getImageData(0, 0, W, H).data;
       const d = this.dctx, c = this.ctx;
@@ -324,7 +356,21 @@
       const px = this.px, py = this.py, dw = px * 0.8, dh = py * 0.8;
       for (let y = 0; y < H; y++) {
         const row = y * W * 4;
-        for (let x = 0; x < W; x++) if (img[row + x * 4 + 3] > 100) d.fillRect(x * px, y * py, dw, dh);
+        for (let x = 0; x < W; x++) {
+          const o = row + x * 4;
+          if (img[o + 3] > 100) {
+            if (img[o + 1] > 100) d.fillRect(x * px, y * py, dw, dh);
+            else (this._dim || (this._dim = [])).push(x, y);
+          }
+        }
+      }
+      // puntos tenues (dibujados en rojo puro por las escenas)
+      if (this._dim && this._dim.length) {
+        d.fillStyle = 'rgba(255,255,255,0.3)';
+        const dm = this._dim;
+        for (let i = 0; i < dm.length; i += 2) d.fillRect(dm[i] * px, dm[i + 1] * py, dw, dh);
+        dm.length = 0;
+        d.fillStyle = '#fff';
       }
       d.globalCompositeOperation = 'source-in';
       let grad;

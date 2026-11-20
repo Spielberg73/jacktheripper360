@@ -7,7 +7,7 @@ Reproductor de música para Windows con aspecto de **autorradio 1‑DIN de los 2
 **Frontal**
 - 8 frontales intercambiables: Stealth Red, Arctic Blue, Carbon Green, Neon Rainbow (iluminación que cambia sola), Titanium Orange, Violet Night, Champagne Gold y Pearl White.
 - Iluminación de teclas personalizable (cualquier color) y color de pantalla independiente (ámbar, azul, verde, rojo, blanco, cian, arcoíris).
-- Pantalla de matriz de puntos 256×64 con animación de bienvenida y 8 modos (botón **DISP**, la tecla **D** o clic en la pantalla): Spectrum, Level Meter, Scope, Speaker, Tunnel, Full Spectrum, Clock y FM Channels.
+- Pantalla de matriz de puntos 256×64 con animación de bienvenida y 11 modos (botón **DISP**, la tecla **D** o clic en la pantalla): Spectrum, Level Meter, Scope, Speaker, Tunnel, Full Spectrum, Clock, FM Channels y tres escenas animadas que reaccionan a la música: **Night Sky** (cielo estrellado con luna, montañas y estrellas fugaces), **Highway** (carretera nocturna con farolas, ciudad al fondo y velocímetro) y **Harbor** (puerto pesquero con barcas, faro, gaviotas y reflejo de la luna).
 - Botón **OPEN**: el frontal se abate y deja ver la ranura del disco para añadir música (o soltar archivos encima).
 - Rueda de volumen 0‑40 (rueda del ratón o girarla arrastrando; un clic hace play/pausa).
 - Teclas 1‑6 como en el coche: **1** RPT (pista/todo), **2** RDM, **3** SCAN (10 s de cada pista), **4** PAUSE, **5/6** −10 s / +10 s.
