@@ -7,7 +7,7 @@ Reproductor de música para Windows con aspecto de **autorradio 1‑DIN de los 2
 **Frontal**
 - 8 frontales intercambiables: Stealth Red, Arctic Blue, Carbon Green, Neon Rainbow (iluminación que cambia sola), Titanium Orange, Violet Night, Champagne Gold y Pearl White.
 - Iluminación de teclas personalizable (cualquier color) y color de pantalla independiente (ámbar, azul, verde, rojo, blanco, cian, arcoíris).
-- Pantalla de matriz de puntos 256×64 con animación de bienvenida y 7 modos (botón **DISP**, la tecla **D** o clic en la pantalla): Spectrum, Level Meter, Scope, Speaker, Tunnel, Full Spectrum y Clock.
+- Pantalla de matriz de puntos 256×64 con animación de bienvenida y 8 modos (botón **DISP**, la tecla **D** o clic en la pantalla): Spectrum, Level Meter, Scope, Speaker, Tunnel, Full Spectrum, Clock y FM Channels.
 - Botón **OPEN**: el frontal se abate y deja ver la ranura del disco para añadir música (o soltar archivos encima).
 - Rueda de volumen 0‑40 (rueda del ratón o girarla arrastrando; un clic hace play/pausa).
 - Teclas 1‑6 como en el coche: **1** RPT (pista/todo), **2** RDM, **3** SCAN (10 s de cada pista), **4** PAUSE, **5/6** −10 s / +10 s.
@@ -22,8 +22,17 @@ Reproductor de música para Windows con aspecto de **autorradio 1‑DIN de los 2
 - Preamp, Bass Boost, Loudness (Off/Low/Mid/High), balance y modo bypass.
 - Limitador al final de la cadena para que los presets extremos no saturen.
 
+**Música de Mega Drive (VGM / VGZ)**
+- Emulación propia del chip FM **Yamaha YM2612** (6 canales, 8 algoritmos, feedback, LFO, modo especial del canal 3 y DAC de samples) y del **PSG SN76489** (3 canales cuadrados + ruido), dentro de un AudioWorklet.
+- Lee las etiquetas GD3 (título, juego, compositor) y respeta los bucles: toca la canción, repite el bucle una vez y hace un fundido de 8 s.
+- Soporta samples de DAC por bloques de datos y por *DAC streams*.
+- Modo de pantalla **FM CHANNELS** con medidores de los 6 canales FM y los 4 del PSG.
+- Pasa por el mismo ecualizador de 31 bandas que el resto de pistas.
+- Las bandas sonoras en VGM se encuentran, por ejemplo, en vgmrips.net. No incluye ninguna.
+- Limitación: el SSG-EG del YM2612 (lo usan pocos juegos) no está emulado todavía.
+
 **Reproductor**
-- MP3, FLAC, WAV, OGG, Opus, M4A/AAC.
+- MP3, FLAC, WAV, OGG, Opus, M4A/AAC, VGM y VGZ.
 - Lee las etiquetas y la carátula (título, artista, álbum, duración, códec y bitrate).
 - Playlist con búsqueda, añadir archivos o carpetas (recursivo) y arrastrar y soltar.
 - Teclas multimedia del teclado, barra de progreso en la barra de tareas y modo compacto (solo el frontal).
@@ -69,6 +78,9 @@ MusicPlayer/
     ├── index.html
     ├── styles.css    frontal, teclas, rueda y paneles
     ├── audio.js      motor Web Audio: 31 filtros peaking, shelves, limitador, analizadores
+    ├── vgm.js        carga de VGM/VGZ y puente con el AudioWorklet
+    ├── vgm-worklet.js
+    ├── chips/        ym2612.js, sn76489.js y vgm-core.js (reproductor VGM)
     ├── display.js    pantalla de matriz de puntos y sus animaciones
     ├── eq.js         ecualizador gráfico y analizador
     └── app.js        playlist, reproducción, frontales y controles

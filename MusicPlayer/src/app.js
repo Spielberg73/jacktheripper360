@@ -44,7 +44,7 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       try {
-        const out = { ...S, playlist: nd ? tracks.map(t => ({ path: t.path, title: t.title, artist: t.artist, album: t.album, duration: t.duration, name: t.name, codec: t.codec, bitrate: t.bitrate, sampleRate: t.sampleRate })) : [] };
+        const out = { ...S, playlist: nd ? tracks.map(t => ({ path: t.path, title: t.title, artist: t.artist, album: t.album, duration: t.duration, name: t.name, codec: t.codec, bitrate: t.bitrate, sampleRate: t.sampleRate, system: t.system })) : [] };
         out.position = engine.el.currentTime || 0;
         out.current = current;
         localStorage.setItem('nightdrive', JSON.stringify(out));
@@ -54,7 +54,8 @@
 
   // ---------------- motor ----------------
   const engine = new AudioEngine();
-  const audio = engine.el;
+  const audio = engine.media;   // <audio> o el emulador VGM, según la pista
+  const isVgm = name => window.NDVgm.isVgm(name);
   const display = new window.NDDisplay.DotDisplay($('#display'), engine);
   const eq = new window.NDEQ.GraphicEQ({ canvas: $('#eqGraph'), fadersEl: $('#faders'), engine, onChange: onEqChange });
 
@@ -235,8 +236,12 @@
     display.flash(`+${fresh.length} PISTAS`, 'AÑADIDAS');
     if (playFirst || current < 0) playIndex(start);
     // metadatos en lotes
-    for (let i = 0; i < fresh.length; i += 25) {
-      const chunk = fresh.slice(i, i + 25);
+    for (const t of fresh.filter(t => isVgm(t.name))) {
+      try { await applyVgmInfo(t, await nd.readFile(t.path)); } catch { /* VGM dañado */ }
+    }
+    const normal = fresh.filter(t => !isVgm(t.name));
+    for (let i = 0; i < normal.length; i += 25) {
+      const chunk = normal.slice(i, i + 25);
       const tags = await nd.tags(chunk.map(t => t.path));
       chunk.forEach((t, k) => {
         const m = tags[k]; if (!m) return;
@@ -249,11 +254,22 @@
       renderList();
       if (tracks[current] && chunk.includes(tracks[current])) updateNowPlaying();
     }
+    renderList();
+    if (tracks[current] && fresh.includes(tracks[current])) updateNowPlaying();
     reshuffle();
     save();
   }
+  async function applyVgmInfo(t, bytes) {
+    const m = await window.NDVgm.info(bytes);
+    if (m.title) t.title = m.title;
+    if (m.artist) t.artist = m.artist;
+    if (m.album) t.album = m.album;
+    t.duration = m.duration;
+    t.codec = m.codec;
+    t.system = m.system;
+  }
   function addFiles(files, playFirst) {
-    const list = [...files].filter(f => f.type.startsWith('audio') || /\.(mp3|flac|wav|ogg|oga|m4a|aac|opus|webm)$/i.test(f.name));
+    const list = [...files].filter(f => f.type.startsWith('audio') || /\.(mp3|flac|wav|ogg|oga|m4a|aac|opus|webm|vgm|vgz)$/i.test(f.name));
     if (!list.length) return;
     if (nd) { // en Electron preferimos rutas (persisten entre sesiones)
       const paths = list.map(f => nd.pathForFile(f)).filter(Boolean);
@@ -264,6 +280,11 @@
     renderList(); reshuffle();
     display.flash(`+${list.length} PISTAS`, 'AÑADIDAS');
     if (playFirst || current < 0) playIndex(start);
+    const vgms = tracks.slice(start).filter(t => isVgm(t.name));
+    (async () => {
+      for (const t of vgms) { try { await applyVgmInfo(t, await t.file.arrayBuffer()); } catch { } }
+      if (vgms.length) { renderList(); if (vgms.includes(tracks[current])) updateNowPlaying(); }
+    })();
   }
   async function pickFiles() {
     if (nd) addPaths(await nd.openFiles());
@@ -328,19 +349,27 @@
   }
 
   // ---------------- reproducción ----------------
-  async function loadTrack(i) {
+  // `seq` evita que una carga antigua más lenta pise a la última pedida
+  async function loadTrack(i, seq = ++loadSeq) {
     const t = tracks[i];
     if (!t) return false;
-    if (curUrl) { URL.revokeObjectURL(curUrl); curUrl = null; }
     try {
+      if (isVgm(t.name)) {
+        const bytes = t.file ? await t.file.arrayBuffer() : await nd.readFile(t.path);
+        if (seq !== loadSeq) return false;
+        await audio.loadVgm(bytes);
+        return true;
+      }
       let blob;
       if (t.file) blob = t.file;
       else {
         const bytes = await nd.readFile(t.path);
         blob = new Blob([bytes], { type: mimeFor(t.name) });
       }
+      if (seq !== loadSeq) return false;
+      if (curUrl) { URL.revokeObjectURL(curUrl); curUrl = null; }
       curUrl = URL.createObjectURL(blob);
-      audio.src = curUrl;
+      audio.loadUrl(curUrl);
       return true;
     } catch (err) {
       console.error(err);
@@ -359,7 +388,7 @@
     current = i;
     renderList();
     updateNowPlaying();
-    const ok = await loadTrack(i);
+    const ok = await loadTrack(i, seq);
     if (seq !== loadSeq) return;
     if (!ok) { setTimeout(() => next(true), 1200); return; }
     if (startAt) audio.addEventListener('loadedmetadata', () => { audio.currentTime = startAt; }, { once: true });
@@ -432,11 +461,11 @@
     $('#npTitle').textContent = t ? t.title : 'Sin pista';
     $('#npArtist').textContent = t ? (t.artist || 'Artista desconocido') : '—';
     $('#npAlbum').textContent = t ? t.album || '' : '';
-    $('#npTech').textContent = t ? [t.codec, t.bitrate && t.bitrate + ' kbps', t.sampleRate && (t.sampleRate / 1000) + ' kHz'].filter(Boolean).join(' · ') : '';
+    $('#npTech').textContent = t ? [t.system, t.codec, t.bitrate && t.bitrate + ' kbps', t.sampleRate && (t.sampleRate / 1000) + ' kHz'].filter(Boolean).join(' · ') : '';
     const st = display.state;
     st.title = t ? t.title : ''; st.artist = t ? [t.artist, t.album].filter(Boolean).join(' / ') : '';
     st.track = current + 1;
-    st.format = t ? (t.name.split('.').pop() || '').toUpperCase().slice(0, 4) : '';
+    st.format = t ? (isVgm(t.name) ? 'VGM' : (t.name.split('.').pop() || '').toUpperCase().slice(0, 4)) : '';
     const title = t ? `${t.artist ? t.artist + ' — ' : ''}${t.title}` : 'NightDrive Player';
     $('#tbTitle').textContent = title;
     document.title = t ? `${t.title} · NightDrive` : 'NightDrive Player';

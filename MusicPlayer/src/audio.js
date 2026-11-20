@@ -85,6 +85,7 @@
       this.preampDb = 0;
       this.setBandCount(31);
       this.setVolume(20);
+      this.media = new MediaSwitch(this);
     }
 
     _shelf(type, f) {
@@ -176,5 +177,44 @@
     }
   }
 
-  window.NDAudio = { AudioEngine, PRESETS, interpPoints, ISO31, ISO10 };
+  // Fachada que hace que <audio> y el reproductor VGM se comporten como un solo medio
+  const EVENTS = ['play', 'pause', 'playing', 'ended', 'loadedmetadata', 'error'];
+  class MediaSwitch extends EventTarget {
+    constructor(engine) {
+      super();
+      this.engine = engine;
+      this.html = engine.el;
+      this.vgm = null;
+      this.active = this.html;
+      this._forward(this.html);
+    }
+    _forward(b) { EVENTS.forEach(ev => b.addEventListener(ev, () => { if (this.active === b) this.dispatchEvent(new Event(ev)); })); }
+    _vgm() {
+      if (!this.vgm) { this.vgm = new window.NDVgm.VgmMedia(this.engine.ctx, this.engine.preamp); this._forward(this.vgm); }
+      return this.vgm;
+    }
+    get isVgm() { return this.active === this.vgm; }
+    get paused() { return this.active.paused; }
+    get duration() { return this.active.duration; }
+    get currentTime() { return this.active.currentTime; }
+    set currentTime(v) { this.active.currentTime = v; }
+    get src() { return this.active.src; }
+    get levels() { return this.isVgm ? this.vgm.levels : null; }
+    play() { return this.active.play(); }
+    pause() { return this.active.pause(); }
+    loadUrl(url) {
+      if (this.vgm) { const v = this.vgm; this.active = this.html; v.unload(); }
+      this.active = this.html;
+      this.html.src = url;
+    }
+    async loadVgm(buf) {
+      const v = this._vgm();
+      const wasHtml = this.active === this.html;
+      this.active = v;
+      if (wasHtml) { this.html.pause(); this.html.removeAttribute('src'); this.html.load(); }
+      await v.load(buf);
+    }
+  }
+
+  window.NDAudio = { AudioEngine, MediaSwitch, PRESETS, interpPoints, ISO31, ISO10 };
 })();

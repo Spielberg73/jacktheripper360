@@ -2,7 +2,7 @@
 (function () {
   const W = 256, H = 64;          // resolución en "puntos"
   const GFX_W = 96;               // zona de animación a la izquierda
-  const MODES = ['SPECTRUM', 'LEVEL METER', 'SCOPE', 'SPEAKER', 'TUNNEL', 'FULL SPECTRUM', 'CLOCK'];
+  const MODES = ['SPECTRUM', 'LEVEL METER', 'SCOPE', 'SPEAKER', 'TUNNEL', 'FULL SPECTRUM', 'CLOCK', 'FM CHANNELS'];
   const FONT = 'bold 12px Consolas, "Lucida Console", "Courier New", monospace';
   const FONT_BIG = 'bold 34px Consolas, "Lucida Console", "Courier New", monospace';
 
@@ -211,6 +211,29 @@
       b.fillRect(x0, 0, w, 1); b.fillRect(x0, H - 1, w, 1);
     }
 
+    // Medidores por canal del chip (solo VGM): FM1-6 | PSG1-3 + ruido
+    gfxChannels(x0, w) {
+      const lv = this.engine.media && this.engine.media.levels;
+      if (!lv) { this.gfxSpectrum(x0, w, 16, this.spec16, this.peak16, 1); return; }
+      if (!this.chPeak) this.chPeak = new Float32Array(10);
+      const b = this.b;
+      const bw = 7, gap = 2, top = 2, bottom = H - 10;
+      let x = x0 + 1;
+      for (let i = 0; i < 10; i++) {
+        if (i === 6) { for (let y = top; y < bottom; y += 2) b.fillRect(x, y, 1, 1); x += 3; }
+        const v = Math.pow(lv[i], 0.6);
+        this.chPeak[i] = Math.max(v, this.chPeak[i] - 0.015);
+        const h = Math.round(v * (bottom - top));
+        for (let y = 0; y < h; y += 3) b.fillRect(x, bottom - y - 2, bw, 2);
+        const ph = Math.round(this.chPeak[i] * (bottom - top));
+        if (ph > 1) b.fillRect(x, bottom - ph - 1, bw, 1);
+        x += bw + gap;
+      }
+      b.font = 'bold 8px Consolas, monospace'; b.textBaseline = 'top'; b.textAlign = 'left';
+      b.fillText('FM', x0 + 20, H - 8);
+      b.fillText('PSG', x0 + 66, H - 8);
+    }
+
     drawInfo(x0, w) {
       const s = this.state;
       const now = performance.now();
@@ -281,6 +304,7 @@
           else if (mode === 'SCOPE') this.gfxScope(0, GFX_W);
           else if (mode === 'SPEAKER') this.gfxSpeaker(0, GFX_W);
           else if (mode === 'TUNNEL') this.gfxTunnel(0, GFX_W);
+          else if (mode === 'FM CHANNELS') this.gfxChannels(0, GFX_W);
           b.clearRect(GFX_W, 0, W - GFX_W, H);
           b.fillStyle = '#fff';
           for (let y = 0; y < H; y += 2) b.fillRect(GFX_W + 2, y, 1, 1);

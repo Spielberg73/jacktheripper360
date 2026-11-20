@@ -3,7 +3,7 @@ const { app, BrowserWindow, ipcMain, dialog, globalShortcut, shell } = require('
 const path = require('path');
 const fs = require('fs');
 
-const AUDIO_EXT = new Set(['.mp3', '.flac', '.wav', '.ogg', '.oga', '.m4a', '.aac', '.opus', '.webm', '.mp4']);
+const AUDIO_EXT = new Set(['.mp3', '.flac', '.wav', '.ogg', '.oga', '.m4a', '.aac', '.opus', '.webm', '.mp4', '.vgm', '.vgz']);
 const FULL_SIZE = { width: 1240, height: 900 };
 const COMPACT_HEIGHT = 400;
 
