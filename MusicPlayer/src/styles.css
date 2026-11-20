@@ -340,3 +340,74 @@ body.dragging #dropOverlay { display: flex; }
 body.compact #transport, body.compact #tabs, body.compact #panels { display: none; }
 body.compact #unit { flex: 1; display: flex; align-items: center; }
 .tb-ver { font-style: normal; font-size: 10px; letter-spacing: .1em; color: #5d626d; margin-left: 2px; }
+
+/* ---------- móvil (Android) y pantallas estrechas ---------- */
+html.mobile, html.mobile body { height: auto; min-height: 100%; overflow-x: hidden; overflow-y: auto; -webkit-tap-highlight-color: transparent; }
+html.mobile #app { height: auto; min-height: 100vh; }
+html.mobile #titlebar { -webkit-app-region: no-drag; }
+html.mobile #tbTop { display: none; }
+.tb-btns button.wide { width: auto; padding: 0 14px; font: 700 11px var(--ui); letter-spacing: .12em; }
+html.mobile .pl-play { display: none !important; }
+html.mobile .pl-row:hover .pl-num { display: inline; }
+html.mobile .tab-hint { display: none; }
+html.mobile .ft { touch-action: pan-x; }
+html.mobile #panels { flex: none; }
+html.mobile .panel { position: static; overflow: visible; }
+html.mobile .pl { min-height: 55vh; }
+html.mobile .pl-row { height: 44px; }
+[hidden] { display: none !important; }
+
+@media (max-width: 760px) {
+  #titlebar { gap: 6px; padding-left: 8px; }
+  .tb-title { display: none; }
+  .tb-logo { letter-spacing: .18em; }
+  #unit { padding: 8px 6px 2px; }
+  #transport { padding: 6px 8px 8px; gap: 6px; }
+  .ttime { width: 36px; font-size: 11px; }
+  .tvol { display: none; }
+  .tbtn { width: 32px; height: 32px; }
+  .tbtn.big { width: 40px; height: 40px; }
+  #tabs { padding: 0 4px; overflow-x: auto; }
+  #tabs button { padding: 11px 9px; font-size: 11px; letter-spacing: .1em; white-space: nowrap; }
+  #panels { flex: none; }
+  .panel { position: static; padding: 10px 8px 16px; overflow: visible; }
+  .eq-graph-wrap { flex: none; height: 190px; }
+  .eq-bottom { flex-direction: column; height: auto; gap: 10px; }
+  .faders { height: 190px; flex: none; overflow-x: auto; }
+  .fader { flex: none; width: 28px; }
+  .faders[data-count="10"] .fader { flex: 1; width: auto; }
+  .eq-side { width: 100%; }
+  .eq-presets { grid-template-columns: repeat(4, 1fr); }
+  .eq-presets button { padding: 9px 1px; }
+  .seg button { padding: 8px 0; }
+  #panel-list { flex-direction: column; gap: 10px; }
+  .np { width: 100%; display: grid; grid-template-columns: 76px 1fr; column-gap: 12px; row-gap: 2px; align-items: center; }
+  .np-cover { width: 76px; height: 76px; grid-row: span 4; }
+  .np-cd { inset: 6px; }
+  .np-title { margin-top: 0; font-size: 14px; }
+  .pl { min-height: 55vh; }
+  .pl-bar { flex-wrap: wrap; }
+  .pl-bar .mbtn { flex: 1; padding: 10px 6px; }
+  .pl-bar input { width: 100%; margin-left: 0; }
+  .pl-head, .pl-row { grid-template-columns: 30px 1.7fr 1fr 44px; gap: 8px; padding: 0 8px; }
+  .pl-head span:nth-child(4), .pl-row span:nth-child(4) { display: none; }
+  .pl-row { height: 44px; }
+  .skins { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .skin-prev { height: 48px; }
+  .skin-prev .sk-knob { width: 32px; height: 32px; }
+  .skin-prev .sk-joy { width: 26px; height: 26px; }
+  .slot-actions { flex-wrap: wrap; justify-content: center; }
+}
+
+/* móvil en horizontal: el frontal ocupa el ancho, el resto debajo */
+@media (orientation: landscape) and (max-height: 520px) {
+  #titlebar { height: 30px; }
+  #unit { padding: 4px 10px 0; }
+  .chassis { max-width: calc((100vh - 100px) * 1180 / 318); }
+  #transport { padding: 4px 16px 6px; }
+}
+
+/* modo coche: solo el frontal, lo más grande posible */
+html.mobile body.compact #app { height: 100vh; min-height: 0; }
+body.compact #unit { flex: 1; display: flex; align-items: center; padding: 6px; }
+html.mobile body.compact .chassis { max-width: min(100%, calc((100vh - 50px) * 1180 / 318)); }

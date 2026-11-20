@@ -1,0 +1,10 @@
+{
+  "appId": "com.nightdrive.player",
+  "appName": "NightDrive Player",
+  "webDir": "www",
+  "backgroundColor": "#07070a",
+  "android": {
+    "backgroundColor": "#07070a",
+    "adjustMarginsForEdgeToEdge": "force"
+  }
+}

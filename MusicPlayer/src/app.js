@@ -3,6 +3,31 @@
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
   const nd = window.nd || null;              // API de Electron (null en navegador)
+  // Android (Capacitor): servicio de reproducción en segundo plano y controles multimedia
+  const Cap = window.Capacitor;
+  const Native = Cap && Cap.isNativePlatform && Cap.isNativePlatform()
+    ? (Cap.registerPlugin ? Cap.registerPlugin('NightDrive') : (Cap.Plugins && Cap.Plugins.NightDrive) || null) : null;
+  const isTouch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  // Biblioteca interna (IndexedDB) para móvil/navegador: los archivos importados siguen ahí al volver
+  const lib = (!nd && window.indexedDB) ? (() => {
+    let dbp = null;
+    const db = () => dbp || (dbp = new Promise((res, rej) => {
+      const r = indexedDB.open('nightdrive-library', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('files');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    }));
+    const tx = async (mode, fn) => {
+      const d = await db();
+      return new Promise((res, rej) => { const t = d.transaction('files', mode); const q = fn(t.objectStore('files')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+    };
+    return {
+      add: async f => { const k = Date.now().toString(36) + Math.random().toString(36).slice(2, 7); await tx('readwrite', s => s.put(f, k)); return k; },
+      get: k => tx('readonly', s => s.get(k)),
+      keys: () => tx('readonly', s => s.getAllKeys()),
+      del: k => tx('readwrite', s => s.delete(k))
+    };
+  })() : null;
+  if (lib && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   const { AudioEngine, PRESETS } = window.NDAudio;
 
   // ---------------- frontales (skins) ----------------
@@ -44,8 +69,9 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       try {
-        const out = { ...S, playlist: nd ? tracks.filter(t => !t.scanning).map(t => ({ path: t.path, entry: t.entry, zip: t.zip, tagged: t.tagged, rom: t.rom, title: t.title, artist: t.artist, album: t.album, duration: t.duration, name: t.name, codec: t.codec, bitrate: t.bitrate, sampleRate: t.sampleRate, system: t.system })) : [] };
-        out.position = engine.el.currentTime || 0;
+        const keep = t => !t.scanning && (nd ? t.path : t.lib);
+        const out = { ...S, playlist: (nd || lib) ? tracks.filter(keep).map(t => ({ path: t.path, lib: t.lib, entry: t.entry, zip: t.zip, tagged: t.tagged, rom: t.rom, title: t.title, artist: t.artist, album: t.album, duration: t.duration, name: t.name, codec: t.codec, bitrate: t.bitrate, sampleRate: t.sampleRate, system: t.system })) : [] };
+        out.position = engine.media.currentTime || 0;
         out.current = current;
         localStorage.setItem('nightdrive', JSON.stringify(out));
       } catch { /* almacenamiento no disponible */ }
@@ -134,6 +160,11 @@
     $('#illHue').value = S.illHue;
     $('#illAuto').onchange = e => { S.illAuto = e.target.checked; applyIllum(); save(); };
     $('#illHue').oninput = e => { S.illHue = +e.target.value; S.illAuto = false; $('#illAuto').checked = false; applyIllum(); save(); };
+    if (Native) {
+      $('#optAwake').hidden = false;
+      $('#keepAwake').checked = !!S.keepAwake;
+      $('#keepAwake').onchange = e => { S.keepAwake = e.target.checked; Native.keepAwake({ on: S.keepAwake || document.body.classList.contains('compact') }).catch(() => {}); save(); };
+    }
     $('#dimmer').value = S.dimmer;
     $('#dimmer').oninput = e => { S.dimmer = +e.target.value; display.brightness = S.dimmer; save(); };
     refreshChips();
@@ -235,7 +266,12 @@
   // ---- lectura de bytes (archivo suelto o dentro de un ZIP) ----
   let zipCache = { key: null, bytes: null };
   async function readSource(src) {
-    const key = src.file || src.path;
+    if (!src.file && src.lib) {
+      const blob = await lib.get(src.lib);
+      if (!blob) throw new Error('El archivo ya no está en la biblioteca');
+      src.file = new File([blob], src.zip || src.name || 'archivo');
+    }
+    const key = src.lib || src.file || src.path;
     if (zipCache.key === key) return zipCache.bytes;
     const bytes = src.file ? new Uint8Array(await src.file.arrayBuffer()) : await nd.readFile(src.path);
     if (isZip(src.file ? src.file.name : src.path)) zipCache = { key, bytes };
@@ -305,7 +341,7 @@
     return { id: uid++, ...src, name, title: 'Analizando ROM…', artist: 'Mega Drive', album: name, duration: 0, scanning: true };
   }
   function romTrack(src, res, t, i) {
-    const base = { id: uid++, path: src.path, file: src.file, entry: src.entry, zip: src.zip, name: src.name, album: res.title, system: 'Mega Drive', codec: 'ROM · 68000 + Z80 + YM2612 + PSG' };
+    const base = { id: uid++, path: src.path, file: src.file, lib: src.lib, entry: src.entry, zip: src.zip, name: src.name, album: res.title, system: 'Mega Drive', codec: 'ROM · 68000 + Z80 + YM2612 + PSG' };
     if (!t) return { ...base, title: res.title + ' (modo libre)', artist: 'Arranque del juego', duration: 180, rom: { crc: res.crc, free: true } };
     const n = String(i + 1).padStart(2, '0');
     return { ...base, title: (t.kind === 'jingle' ? 'Jingle ' : 'Track ') + n, artist: 'Mega Drive · ID ' + t.value.toString(16).toUpperCase() + 'h',
@@ -366,7 +402,17 @@
       const paths = list.map(f => nd.pathForFile(f)).filter(Boolean);
       if (paths.length) return addPaths(paths, playFirst);
     }
-    return addSources(list.map(f => ({ file: f })), playFirst);
+    return (async () => {
+      // móvil/navegador: copiamos los archivos a la biblioteca interna para que sigan ahí mañana
+      const srcs = [];
+      for (const f of list) {
+        let key = null;
+        if (lib) { try { key = await lib.add(f); } catch (e) { console.warn('biblioteca', e); } }
+        srcs.push(key ? { file: f, lib: key } : { file: f });
+      }
+      if (lib) display.flash('GUARDADO', srcs.filter(s => s.lib).length + ' ARCHIVOS');
+      return addSources(srcs, playFirst);
+    })();
   }
   async function pickFiles() {
     if (nd) addPaths(await nd.openFiles());
@@ -404,9 +450,17 @@
     list.addEventListener('dblclick', e => { const r = e.target.closest('.pl-row'); if (r) playIndex(+r.dataset.i); });
     list.addEventListener('click', e => {
       const r = e.target.closest('.pl-row'); if (!r) return;
-      if (e.target.closest('.pl-play')) { playIndex(+r.dataset.i); return; }
+      if (e.target.closest('.pl-play') || (isTouch && !selected.size)) { playIndex(+r.dataset.i); return; }
       const t = tracks[+r.dataset.i];
-      if (!e.ctrlKey) { selected.clear(); list.querySelectorAll('.pl-row.sel').forEach(x => x.classList.remove('sel')); }
+      if (!e.ctrlKey && !isTouch) { selected.clear(); list.querySelectorAll('.pl-row.sel').forEach(x => x.classList.remove('sel')); }
+      selected.has(t.id) ? selected.delete(t.id) : selected.add(t.id);
+      r.classList.toggle('sel', selected.has(t.id));
+    });
+    // en pantallas táctiles: pulsación larga = seleccionar (para QUITAR)
+    list.addEventListener('contextmenu', e => {
+      const r = e.target.closest('.pl-row'); if (!r) return;
+      e.preventDefault();
+      const t = tracks[+r.dataset.i];
       selected.has(t.id) ? selected.delete(t.id) : selected.add(t.id);
       r.classList.toggle('sel', selected.has(t.id));
     });
@@ -419,6 +473,11 @@
     $('#plSearch').oninput = e => { filter = e.target.value; renderList(); };
     $('#fileInput').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
   }
+  function libraryCleanup() {
+    if (!lib) return;
+    const used = new Set(tracks.map(t => t.lib).filter(Boolean));
+    lib.keys().then(keys => keys.forEach(k => { if (!used.has(k)) lib.del(k); })).catch(() => {});
+  }
   function removeSelected() {
     if (!selected.size) return;
     const curTrack = tracks[current];
@@ -426,12 +485,13 @@
     selected.clear();
     current = curTrack ? tracks.indexOf(curTrack) : -1;
     if (curTrack && current < 0) { stop(); }
-    reshuffle(); renderList(); save();
+    reshuffle(); renderList(); save(); libraryCleanup();
   }
   function clearList() {
     stop();
     tracks = []; current = -1; selected.clear();
-    renderList(); updateNowPlaying(); save();
+    renderList(); updateNowPlaying(); save(); libraryCleanup();
+    if (Native) Native.stop().catch(() => {});
     display.flash('EJECT', 'PLAYLIST VACÍA');
   }
 
@@ -548,7 +608,18 @@
     updateIcons(); save();
   }
 
+  function nativeUpdate() {
+    if (!Native) return;
+    const t = tracks[current];
+    Native.update({ title: t ? t.title : 'NightDrive Player', artist: t ? [t.artist, t.album].filter(Boolean).join(' · ') : '', playing: !audio.paused }).catch(() => {});
+  }
+  if (Native) Native.addListener('mediaAction', ({ action }) => {
+    if (action === 'play') play(); else if (action === 'pause') pause();
+    else if (action === 'playpause') togglePlay(); else if (action === 'next') next(); else if (action === 'prev') prev();
+  });
+
   async function updateNowPlaying() {
+    nativeUpdate();
     const t = tracks[current];
     $('#npTitle').textContent = t ? t.title : 'Sin pista';
     $('#npArtist').textContent = t ? (t.artist || 'Artista desconocido') : '—';
@@ -649,6 +720,7 @@
     save();
   }
   function setCompact(v) {
+    if (Native) { Native.keepAwake({ on: v || !!S.keepAwake }).catch(() => {}); if (v && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); else if (!v && document.fullscreenElement) document.exitFullscreen().catch(() => {}); }
     document.body.classList.toggle('compact', v);
     $('#tbCompact').classList.toggle('on', v);
     if (nd) nd.compact(v);
@@ -772,8 +844,8 @@
   }
 
   // eventos del <audio>
-  audio.addEventListener('play', updateIcons);
-  audio.addEventListener('pause', () => { updateIcons(); renderList(); save(); });
+  audio.addEventListener('play', () => { updateIcons(); nativeUpdate(); });
+  audio.addEventListener('pause', () => { updateIcons(); renderList(); save(); nativeUpdate(); });
   audio.addEventListener('playing', renderList);
   audio.addEventListener('ended', () => next(true));
   audio.addEventListener('loadedmetadata', () => {
@@ -826,11 +898,17 @@
     $('#iconMode').textContent = window.NDDisplay.MODES[display.mode];
     refreshChips();
     $('#tbTop').classList.toggle('on', !!S.onTop);
+    if (Native) {
+      $('#tbCompact').textContent = 'MODO COCHE';
+      $('#tbCompact').classList.add('wide');
+      $$('#plFolder, #slotFolder').forEach(b => { b.hidden = true; });
+      if (S.keepAwake) Native.keepAwake({ on: true }).catch(() => {});
+    }
     if (nd && S.onTop) nd.onTop(true);
     setTab(S.tab || 'eq');
 
-    // restaurar playlist (Electron)
-    if (nd && S.playlist && S.playlist.length) {
+    // restaurar playlist (Electron: rutas; móvil/navegador: biblioteca interna)
+    if ((nd || lib) && S.playlist && S.playlist.length) {
       tracks = S.playlist.map(t => ({ id: uid++, ...t }));
       renderList(); reshuffle();
       if (S.current >= 0 && S.current < tracks.length) {

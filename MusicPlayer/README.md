@@ -79,6 +79,19 @@ npm run dist       :: genera el instalador y la versión portable en MusicPlayer
 
 Además, cada push que toca `MusicPlayer/` lanza el workflow **NightDrive Player (Windows build)** en GitHub Actions. El workflow compila los dos `.exe` y los publica como artefacto (`NightDrive-Player-Windows`).
 
+## Android
+
+La carpeta `mobile/` empaqueta la misma app con Capacitor (Android 6.0 o superior):
+
+- La interfaz se adapta al móvil. En vertical, el frontal queda arriba y debajo van el ecualizador (los deslizadores se arrastran en horizontal) y la playlist. En horizontal parece un frontal de verdad.
+- **Modo coche** (botón de arriba): pantalla completa solo con el frontal y la pantalla siempre encendida.
+- **Biblioteca**: los archivos que importas (MP3, ZIP, VGZ, ROMs…) se guardan dentro de la app, así que siguen ahí al volver a abrirla.
+- **Segundo plano**: un servicio de Android mantiene la música con la pantalla apagada. La notificación tiene anterior/pausa/siguiente, y responde a los botones multimedia de los auriculares y del Bluetooth del coche.
+- Un toque en una canción la reproduce. Una pulsación larga la selecciona, para poder QUITARLA.
+- El botón "Atrás" deja la app en segundo plano en lugar de cerrarla.
+
+Para compilarla: `cd mobile && npm install && npm run apk` (necesita el SDK de Android y Java 21). El workflow **NightDrive Player (Android APK)** de GitHub Actions la compila sola en cada cambio.
+
 ## Pruebas
 
 ```bat
