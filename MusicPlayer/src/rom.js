@@ -27,18 +27,18 @@
     });
   }
 
-  const cacheKey = crc => 'ndrom:v1:' + crc;
+  const cacheKey = crc => 'ndrom:v2:' + crc;
   function cached(crc) { try { return JSON.parse(localStorage.getItem(cacheKey(crc)) || 'null'); } catch { return null; } }
   function store(crc, res) { try { localStorage.setItem(cacheKey(crc), JSON.stringify(res)); } catch { } }
 
-  // Devuelve { crc, title, isMD, mode, mailbox, value, frame, tracks[] }
+  // Devuelve { crc, title, isMD, mode, template, frame, tracks[] }
   async function scan(bytes, onProgress) {
     const info = await call('info', bytes);
     if (!info.isMD) return { ...info, mode: 'none', tracks: [] };
     const hit = cached(info.crc);
     if (hit) return hit;
     const res = await call('scan', bytes, {}, onProgress);
-    const out = { crc: res.crc, title: res.title, isMD: true, mode: res.mode, mailbox: res.mailbox, value: res.value, frame: res.frame, reason: res.reason, tracks: res.tracks };
+    const out = { crc: res.crc, title: res.title, isMD: true, mode: res.mode, template: res.template, frame: res.frame, reason: res.reason, tracks: res.tracks };
     store(info.crc, out);
     return out;
   }

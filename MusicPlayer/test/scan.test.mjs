@@ -11,15 +11,16 @@ console.log('ROM:', info.title, info.serial, info.region, 'isMD', info.isMD);
 let t = Date.now();
 const l = learn(info);
 console.log('learn', JSON.stringify(l), Date.now() - t, 'ms');
-check('buzón aprendido en 1F00h con 81h', l.mode === 'z80' && l.mailbox === 0x1F00 && l.value === 0x81);
+const tp = l.templates && l.templates[0];
+check('buzón aprendido en 1F00h con 81h', l.mode === 'z80' && tp && tp.writes[tp.vars[0]][0] === 0x1F00 && tp.writes[tp.vars[0]][1] === 0x81);
 t = Date.now();
 const res = scanRom(info);
 console.log('scan', JSON.stringify(res.tracks), res.ms, 'ms');
 check('canciones 81h, 82h y jingle 83h', res.tracks.length === 3 && res.tracks[0].value === 0x81 && res.tracks[0].kind === 'song' && res.tracks[1].value === 0x82 && res.tracks[2].value === 0x83 && res.tracks[2].kind === 'jingle');
 // reproducir la 82h y medir la primera nota (La3 = 220 Hz, canal FM)
-const snap = snapshotAt(info, l.frame);
+const snap = snapshotAt(info, res.frame);
 const p = new MdPlayer(48000);
-p.load({ rom: info.rom, snapshot: snap, mailbox: l.mailbox, value: 0x82, duration: 20 });
+p.load({ rom: info.rom, snapshot: snap, template: res.template, value: 0x82, duration: 20 });
 const L = new Float32Array(128), R = new Float32Array(128), out = [];
 t = Date.now();
 for (let i = 0; i < 48000 * 4 / 128; i++) { p.render(L, R); for (const v of L) out.push(v); }

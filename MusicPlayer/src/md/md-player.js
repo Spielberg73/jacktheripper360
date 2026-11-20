@@ -1,12 +1,13 @@
 // Reproduce música de una ROM de Mega Drive emulando la consola (para el AudioWorklet)
 import { MegaDrive, parseRom } from './megadrive.js';
+import { applyTemplate } from './scan.js';
 
 const FM_GAIN = 0.2 / 8192, PSG_GAIN = 0.11, FADE = 8;
 
 export class MdPlayer {
   constructor(outRate) { this.outRate = outRate; this.loaded = false; }
 
-  // cfg: { rom, snapshot?, mailbox?, value?, duration, jingle }
+  // cfg: { rom, snapshot?, template?, value?, duration, jingle }
   load(cfg) {
     this.cfg = cfg;
     this.info = parseRom(cfg.rom);
@@ -24,7 +25,7 @@ export class MdPlayer {
       md.load(c.snapshot);
       md.frozen68k = true;
       md.z80BusReq = false;
-      md.zram[c.mailbox] = c.value;
+      applyTemplate(md, c.template, c.value);
       // el arranque se hizo sin síntesis: dejamos el FM en silencio limpio
       for (const ch of md.ym.ch) for (const o of ch.ops) { o.state = 0; o.vol = 1023; o.key = 0; }
     } else {

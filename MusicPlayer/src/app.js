@@ -309,7 +309,7 @@
     if (!t) return { ...base, title: res.title + ' (modo libre)', artist: 'Arranque del juego', duration: 180, rom: { crc: res.crc, free: true } };
     const n = String(i + 1).padStart(2, '0');
     return { ...base, title: (t.kind === 'jingle' ? 'Jingle ' : 'Track ') + n, artist: 'Mega Drive · ID ' + t.value.toString(16).toUpperCase() + 'h',
-      duration: t.kind === 'jingle' ? t.length : 150, rom: { crc: res.crc, mailbox: res.mailbox, frame: res.frame, value: t.value, jingle: t.kind === 'jingle' } };
+      duration: t.kind === 'jingle' ? t.length : 150, rom: { crc: res.crc, template: res.template, frame: res.frame, value: t.value, jingle: t.kind === 'jingle' } };
   }
   async function scanRomTrack(ph) {
     let lastDraw = 0;
@@ -446,7 +446,7 @@
       if (t.rom) {
         const snap = t.rom.free ? null : await window.NDRom.snapshot(bytes, t.rom);
         if (seq !== loadSeq) return false;
-        await audio.loadMd({ rom: bytes, snapshot: snap, mailbox: t.rom.mailbox, value: t.rom.value, duration: t.duration, jingle: !!t.rom.jingle });
+        await audio.loadMd({ rom: bytes, snapshot: snap, template: t.rom.template, value: t.rom.value, duration: t.duration, jingle: !!t.rom.jingle });
         return true;
       }
       if (isVgm(t.name)) {
