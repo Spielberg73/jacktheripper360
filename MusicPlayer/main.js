@@ -3,7 +3,7 @@ const { app, BrowserWindow, ipcMain, dialog, globalShortcut, shell } = require('
 const path = require('path');
 const fs = require('fs');
 
-const AUDIO_EXT = new Set(['.mp3', '.flac', '.wav', '.ogg', '.oga', '.m4a', '.aac', '.opus', '.webm', '.mp4', '.vgm', '.vgz']);
+const AUDIO_EXT = new Set(['.mp3', '.flac', '.wav', '.ogg', '.oga', '.m4a', '.aac', '.opus', '.webm', '.mp4', '.vgm', '.vgz', '.zip']);
 const FULL_SIZE = { width: 1240, height: 900 };
 const COMPACT_HEIGHT = 400;
 
@@ -144,6 +144,30 @@ ipcMain.handle('meta:tags', async (_e, paths) => {
     }
   }
   return out;
+});
+
+function tagsFrom(m) {
+  return {
+    title: m.common.title || null,
+    artist: m.common.artist || null,
+    album: m.common.album || null,
+    track: m.common.track && m.common.track.no || null,
+    duration: m.format.duration || null,
+    codec: m.format.codec || m.format.container || null,
+    bitrate: m.format.bitrate ? Math.round(m.format.bitrate / 1000) : null,
+    sampleRate: m.format.sampleRate || null
+  };
+}
+
+// etiquetas a partir de bytes (canciones dentro de un ZIP)
+ipcMain.handle('meta:buffer', async (_e, bytes, name) => {
+  try {
+    const lib = await meta();
+    const ext = path.extname(name || '').slice(1).toLowerCase();
+    const mime = { mp3: 'audio/mpeg', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', m4a: 'audio/mp4', aac: 'audio/aac' }[ext];
+    const m = await lib.parseBuffer(Buffer.from(bytes), { mimeType: mime, path: name }, { skipCovers: true });
+    return tagsFrom(m);
+  } catch { return null; }
 });
 
 ipcMain.handle('meta:cover', async (_e, p) => {

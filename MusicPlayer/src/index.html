@@ -10,7 +10,7 @@
 <body>
 <div id="app">
   <header id="titlebar">
-    <div class="tb-logo"><span class="tb-dot"></span>NIGHTDRIVE <b>PLAYER</b></div>
+    <div class="tb-logo"><span class="tb-dot"></span>NIGHTDRIVE <b>PLAYER</b><i class="tb-ver">v1.2</i></div>
     <div class="tb-title" id="tbTitle">—</div>
     <div class="tb-btns">
       <button id="tbTop" title="Siempre encima">⇡</button>
@@ -58,7 +58,7 @@
           <div class="brandrow">
             <span class="brand">NIGHTDRIVE</span>
             <span class="model">ND-X2000MP</span>
-            <span class="badges"><b>MP3</b><b>FLAC</b><b>VGM</b><b>OGG</b><em>31-BAND GEQ</em><em>24-BIT DSP</em></span>
+            <span class="badges"><b>MP3</b><b>FLAC</b><b>VGM</b><b>ZIP</b><em>31-BAND GEQ</em><em>24-BIT DSP</em></span>
           </div>
           <div class="display-wrap">
             <div class="icons" id="icons">
@@ -196,12 +196,13 @@
     </div>
   </section>
 
-  <input type="file" id="fileInput" multiple accept="audio/*,.flac,.m4a,.opus,.vgm,.vgz" hidden>
+  <input type="file" id="fileInput" multiple accept="audio/*,.flac,.m4a,.opus,.vgm,.vgz,.zip" hidden>
   <div id="dropOverlay"><div>SUELTA PARA AÑADIR A LA PLAYLIST</div></div>
 </div>
 
 <script src="audio.js"></script>
 <script src="vgm.js"></script>
+<script src="zip.js"></script>
 <script src="display.js"></script>
 <script src="eq.js"></script>
 <script src="app.js"></script>

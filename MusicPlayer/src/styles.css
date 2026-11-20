@@ -296,6 +296,11 @@ body.playing .np-cd { animation-play-state: running; }
 .pl-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pl-row span:first-child, .pl-row span:last-child { font-family: var(--mono); color: #5d626d; }
 .pl-row:hover { background: #13151a; }
+.pl-row b { font-weight: inherit; }
+.pl-play { display: none; width: 22px; height: 20px; line-height: 20px; text-align: center; border-radius: 4px; color: #000; background: var(--illum); cursor: pointer; font-size: 10px; }
+.pl-row:hover .pl-num { display: none; }
+.pl-row:hover .pl-play { display: inline-block; }
+.pl-list:focus { outline: none; }
 .pl-row.sel { background: #1a1d24; }
 .pl-row.cur { color: var(--illum); text-shadow: 0 0 8px var(--illum-soft); }
 .pl-row.cur span:first-child { color: var(--illum); }
@@ -334,3 +339,4 @@ body.dragging #dropOverlay { display: flex; }
 /* ---------- modo compacto ---------- */
 body.compact #transport, body.compact #tabs, body.compact #panels { display: none; }
 body.compact #unit { flex: 1; display: flex; align-items: center; }
+.tb-ver { font-style: normal; font-size: 10px; letter-spacing: .1em; color: #5d626d; margin-left: 2px; }

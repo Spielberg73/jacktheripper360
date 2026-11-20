@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('nd', {
   readFile: p => ipcRenderer.invoke('fs:read', p),
   exists: p => ipcRenderer.invoke('fs:exists', p),
   tags: paths => ipcRenderer.invoke('meta:tags', paths),
+  tagsBuffer: (bytes, name) => ipcRenderer.invoke('meta:buffer', bytes, name),
   cover: p => ipcRenderer.invoke('meta:cover', p),
   pendingFiles: () => ipcRenderer.invoke('app:pending-files'),
   pathForFile: f => { try { return webUtils.getPathForFile(f); } catch { return null; } },

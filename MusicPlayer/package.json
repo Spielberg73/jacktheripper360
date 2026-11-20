@@ -1,7 +1,7 @@
 {
   "name": "nightdrive-player",
   "productName": "NightDrive Player",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Reproductor de música para Windows con ecualizador gráfico de 31 bandas y frontales estilo autorradio de los 2000",
   "main": "main.js",
   "author": "NightDrive",
