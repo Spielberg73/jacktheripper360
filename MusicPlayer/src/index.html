@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: data: https: http:; connect-src 'self' https:; style-src 'self' 'unsafe-inline'; script-src 'self'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NightDrive Player</title>
   <link rel="stylesheet" href="styles.css">
@@ -120,6 +120,7 @@
   <nav id="tabs">
     <button data-tab="eq" class="on">ECUALIZADOR</button>
     <button data-tab="list">PLAYLIST <span id="listCount">0</span></button>
+    <button data-tab="radio">RADIO</button>
     <button data-tab="skins">FRONTALES</button>
     <span class="tab-hint">Espacio: play · ←/→: buscar · Ctrl+←/→: pista · ↑/↓: volumen · D: pantalla</span>
   </nav>
@@ -168,6 +169,27 @@
         <div class="pl-head"><span>#</span><span>TÍTULO</span><span>ARTISTA</span><span>ÁLBUM</span><span>TIEMPO</span></div>
         <div class="pl-list" id="plList"></div>
         <div class="pl-empty" id="plEmpty">Arrastra aquí canciones o carpetas, o pulsa <b>+ ARCHIVOS</b></div>
+      </div>
+    </div>
+
+    <!-- RADIO -->
+    <div class="panel" id="panel-radio">
+      <aside class="np radio-np">
+        <div class="np-cover"><div class="np-radio"><i></i><i></i><i></i></div><img id="rdCover" alt=""></div>
+        <div class="np-title" id="rdStation">RADIO</div>
+        <div class="np-artist" id="rdArtist">Elige una emisora</div>
+        <div class="np-album" id="rdTitle"></div>
+        <div class="np-tech" id="rdGenre"></div>
+        <button class="mbtn rd-play" id="rdPlay">▶ / ❚❚</button>
+      </aside>
+      <div class="radio-main">
+        <div class="radio-hint">Las teclas <b>1–6</b> del frontal son las presintonías P1–P6 y <b>SRC</b> cambia entre DISC y RADIO.</div>
+        <div class="stations" id="stations"></div>
+        <form class="radio-add" id="radioAdd">
+          <input id="raName" placeholder="Nombre de la emisora" maxlength="24">
+          <input id="raUrl" placeholder="URL del stream (https://…)" inputmode="url">
+          <button class="mbtn" type="submit">+ AÑADIR EMISORA</button>
+        </form>
       </div>
     </div>
 

@@ -411,3 +411,37 @@ html.mobile .pl-row { height: 44px; }
 html.mobile body.compact #app { height: 100vh; min-height: 0; }
 body.compact #unit { flex: 1; display: flex; align-items: center; padding: 6px; }
 html.mobile body.compact .chassis { max-width: min(100%, calc((100vh - 50px) * 1180 / 318)); }
+
+/* ---------- radio ---------- */
+#panel-radio { gap: 16px; }
+.radio-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.radio-hint { font-size: 12px; color: var(--muted); }
+.radio-hint b { color: var(--illum); }
+.stations { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.station { position: relative; text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: linear-gradient(#121318, #0c0d10); color: var(--text); display: flex; flex-direction: column; gap: 3px; min-height: 92px; }
+.station:hover { border-color: #3a3e47; }
+.station.cur { border-color: var(--illum); box-shadow: 0 0 16px var(--illum-soft); }
+.st-pre { position: absolute; right: 10px; top: 10px; font: 700 10px var(--mono); color: #000; background: var(--illum); border-radius: 4px; padding: 2px 5px; }
+.st-name { font: 800 14px var(--ui); letter-spacing: .08em; color: #fff; }
+.station.cur .st-name { color: var(--illum); text-shadow: 0 0 10px var(--illum-soft); }
+.st-genre { font-size: 11px; color: var(--muted); }
+.st-np { font-size: 11.5px; color: var(--disp-a); margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-del { position: absolute; right: 10px; bottom: 8px; color: #777; font-size: 12px; padding: 2px 4px; }
+.st-del:hover { color: #ff3b30; }
+.radio-add { display: flex; gap: 8px; flex-wrap: wrap; }
+.radio-add input { flex: 1; min-width: 160px; background: #08090b; border: 1px solid #262930; border-radius: 6px; color: #fff; padding: 8px 10px; font: 12px var(--ui); outline: none; }
+.radio-add input:focus { border-color: var(--illum); }
+.rd-play { margin-top: 8px; }
+.np-radio { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.np-radio i { position: absolute; border: 2px solid var(--illum); border-radius: 50%; opacity: 0; animation: wave 2.4s ease-out infinite; box-shadow: 0 0 12px var(--illum-soft); }
+.np-radio i:nth-child(2) { animation-delay: .8s; } .np-radio i:nth-child(3) { animation-delay: 1.6s; }
+body.playing .np-radio i { animation-play-state: running; }
+.np-radio i { animation-play-state: paused; }
+@keyframes wave { from { width: 20px; height: 20px; opacity: .9; } to { width: 200px; height: 200px; opacity: 0; } }
+@media (max-width: 760px) {
+  #panel-radio { flex-direction: column; gap: 10px; }
+  .radio-np { width: 100%; }
+  .stations { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .station { min-height: 84px; padding: 10px; }
+  .rd-play { grid-column: 2; }
+}

@@ -248,13 +248,13 @@
       const s = this.state;
       const now = performance.now();
       const msg = this.message && now < this.message.until ? this.message : null;
-      if (!s.hasDisc) {
+      if (!s.hasDisc && !s.radio) {
         this.text('NO DISC', x0 + w / 2, 10, 'center');
         if (Math.floor(now / 600) % 2 === 0) this.text('PRESS OPEN', x0 + w / 2, 30, 'center');
         return;
       }
       const blink = !s.playing && Math.floor(now / 500) % 2 === 1;
-      this.text(`${s.format || 'MP3'} T${String(s.track).padStart(2, '0')}`, x0, 1);
+      this.text(s.radio ? `FM P${s.track}` : `${s.format || 'MP3'} T${String(s.track).padStart(2, '0')}`, x0, 1);
       if (!blink) this.text(this.fmt(s.time), x0 + w - 1, 1, 'right');
       if (msg) {
         this.text(msg.text, x0 + w / 2, msg.sub ? 19 : 26, 'center');
@@ -262,6 +262,12 @@
       } else {
         this.scrollText(s.title || 'UNKNOWN', x0, 20, w, 't' + s.title);
         this.scrollText(s.artist || '', x0, 38, w, 'a' + s.artist + s.title);
+      }
+      if (s.radio) { // en directo: indicador de señal en lugar de barra de progreso
+        this.text('ON AIR', x0, 52);
+        const lv = Math.max(this.lvl.L, this.lvl.R);
+        for (let i = 0; i < 6; i++) { const h = 2 + i * 2; if (lv * 7 > i || i < 2) this.b.fillRect(x0 + w - 30 + i * 5, 63 - h, 3, h); }
+        return;
       }
       const p = s.duration > 0 ? Math.min(1, s.time / s.duration) : 0;
       const pw = Math.round(p * w);
@@ -332,7 +338,7 @@
       const b = this.b, s = this.state, now = performance.now();
       if (s.title !== this.hud.title) { this.hud.title = s.title; this.hud.at = now; }
       b.fillStyle = '#fff';
-      if (s.hasDisc) {
+      if (s.hasDisc || s.radio) {
         b.clearRect(W - 38, 0, 38, 13);
         if (!(!s.playing && Math.floor(now / 500) % 2)) this.text(this.fmt(s.time), W - 2, 1, 'right');
         const since = (now - this.hud.at) / 1000;

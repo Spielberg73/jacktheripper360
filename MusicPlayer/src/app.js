@@ -60,7 +60,7 @@
   const DEFAULTS = {
     skin: 'stealth', illAuto: true, illHue: 0, dispColor: 'auto', dimmer: 1, mode: 0,
     volume: 20, bands: 31, gains: null, preset: 'FLAT', preamp: 0, bass: 0, loud: 0, balance: 0, eqOn: true,
-    custom: { C1: null, C2: null }, repeat: 0, shuffle: false, playlist: [], current: -1, position: 0, tab: 'eq', onTop: false
+    custom: { C1: null, C2: null }, source: 'disc', station: 0, customStations: [], repeat: 0, shuffle: false, playlist: [], current: -1, position: 0, tab: 'eq', onTop: false
   };
   let S;
   try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('nightdrive') || '{}')); } catch { S = { ...DEFAULTS }; }
@@ -535,6 +535,7 @@
   let loadSeq = 0;
   async function playIndex(i, startAt = 0, autoplay = true) {
     if (i < 0 || i >= tracks.length) return;
+    if (radio.on) { radio.on = false; S.source = 'disc'; clearInterval(radio.npTimer); display.state.radio = false; radioKeyLabels(); $$('.station').forEach(el => el.classList.remove('cur')); }
     if (tracks[i].scanning) { pendingPlay = tracks[i]; display.flash('ESPERA', 'ANALIZANDO ROM'); return; }
     const seq = ++loadSeq;
     current = i;
@@ -549,12 +550,19 @@
     save();
   }
   async function play() {
+    if (radio.on) {
+      // una emisión en directo pausada mucho rato se vuelve a sintonizar para seguir en directo
+      if (!audio.src || (audio.paused && radio.pausedAt && Date.now() - radio.pausedAt > 15000)) { radio.pausedAt = 0; return tune(S.station); }
+      await engine.resume();
+      try { await audio.play(); } catch (e) { console.warn(e); radioError(); }
+      return;
+    }
     if (current < 0) { if (tracks.length) return playIndex(0); pickFiles(); return; }
     if (!audio.src) return playIndex(current);
     await engine.resume();
     try { await audio.play(); } catch (e) { console.warn(e); }
   }
-  function pause() { audio.pause(); }
+  function pause() { if (radio.on) radio.pausedAt = Date.now(); audio.pause(); }
   function togglePlay() { audio.paused ? play() : pause(); }
   function stop() { audio.pause(); try { audio.currentTime = 0; } catch { } setScan(false); }
   function reshuffle() {
@@ -562,6 +570,7 @@
     for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
   }
   function next(auto) {
+    if (radio.on) return tune(S.station + 1);
     if (!tracks.length) return;
     if (auto && S.repeat === 1) return playIndex(current);
     let n;
@@ -576,6 +585,7 @@
     playIndex(n);
   }
   function prev() {
+    if (radio.on) return tune(S.station - 1);
     if (!tracks.length) return;
     if (audio.currentTime > 3) { audio.currentTime = 0; return; }
     let n;
@@ -583,7 +593,7 @@
     else n = current - 1 < 0 ? tracks.length - 1 : current - 1;
     playIndex(n);
   }
-  function seekBy(s) { if (audio.duration) audio.currentTime = Math.max(0, Math.min(audio.duration - 0.5, audio.currentTime + s)); }
+  function seekBy(s) { if (!radio.on && audio.duration) audio.currentTime = Math.max(0, Math.min(audio.duration - 0.5, audio.currentTime + s)); }
   function setScan(on) {
     scanMode = on;
     clearInterval(scanTimer);
@@ -610,6 +620,7 @@
 
   function nativeUpdate() {
     if (!Native) return;
+    if (radio.on) { const st = station(), np = radio.np; Native.update({ title: np ? np.title : st.name, artist: (np ? np.artist + ' · ' : '') + st.name, playing: !audio.paused }).catch(() => {}); return; }
     const t = tracks[current];
     Native.update({ title: t ? t.title : 'NightDrive Player', artist: t ? [t.artist, t.album].filter(Boolean).join(' · ') : '', playing: !audio.paused }).catch(() => {});
   }
@@ -619,6 +630,7 @@
   });
 
   async function updateNowPlaying() {
+    if (radio.on) return showRadioInfo();
     nativeUpdate();
     const t = tracks[current];
     $('#npTitle').textContent = t ? t.title : 'Sin pista';
@@ -646,6 +658,173 @@
         if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, album: t.album, artwork: [{ src: data }] });
       }
     }
+  }
+
+  // ---------------- radio por internet ----------------
+  const STW = m => `https://playerservices.streamtheworld.com/api/livestream-redirect/${m}.mp3`;
+  const STATIONS = [
+    { id: 'l40c', name: 'LOS40 CLASSIC', short: '40 CLAS', mount: 'LOS40_CLASSIC', genre: 'Clásicos de los 70, 80 y 90' },
+    { id: 'l40', name: 'LOS40', short: 'LOS40', mount: 'LOS40', genre: 'Éxitos actuales' },
+    { id: 'l40d', name: 'LOS40 DANCE', short: 'DANCE', mount: 'LOS40_DANCE', genre: 'Dance y electrónica' },
+    { id: 'l40u', name: 'LOS40 URBAN', short: 'URBAN', mount: 'LOS40_URBAN', genre: 'Urbano y reggaetón' },
+    { id: 'dial', name: 'CADENA DIAL', short: 'DIAL', mount: 'CADENADIAL', genre: 'Música en español' },
+    { id: 'radiole', name: 'RADIOLÉ', short: 'RADIOLE', mount: 'RADIOLE', genre: 'Flamenco, rumba y copla' },
+    { id: 'ser', name: 'CADENA SER', short: 'SER', mount: 'CADENASER', genre: 'Noticias, deportes y magacines' }
+  ].map(s => ({ ...s, url: STW(s.mount) }));
+  const radio = { on: false, np: null, npTimer: 0, retry: 0, pausedAt: 0, plain: false };
+  const stations = () => [...STATIONS, ...(S.customStations || [])];
+  const station = () => stations()[S.station] || stations()[0];
+
+  async function nowPlaying(st) {
+    if (!st || !st.mount) return null;
+    try {
+      const r = await fetch(`https://np.tritondigital.com/public/nowplaying?mountName=${encodeURIComponent(st.mount)}&numberToFetch=1&eventType=track`, { cache: 'no-store' });
+      const x = new DOMParser().parseFromString(await r.text(), 'text/xml');
+      const prop = n => { const e = x.querySelector(`property[name="${n}"]`); return e ? e.textContent.trim() : ''; };
+      const title = prop('cue_title'), artist = prop('track_artist_name');
+      if (!title && !artist) return null;
+      return { title, artist, cover: prop('track_cover_url') };
+    } catch { return null; }
+  }
+
+  async function refreshNowPlaying() {
+    if (!radio.on) return;
+    const st = station();
+    const np = await nowPlaying(st);
+    if (!radio.on || st !== station()) return;
+    const changed = JSON.stringify(np) !== JSON.stringify(radio.np);
+    radio.np = np;
+    showRadioInfo();
+    if (changed && np) display.flash(np.artist.toUpperCase().slice(0, 20) || 'ON AIR', np.title.toUpperCase().slice(0, 20), 2500);
+  }
+
+  function showRadioInfo() {
+    const st = station(), np = radio.np;
+    const ds = display.state;
+    ds.radio = true; ds.hasDisc = true;
+    ds.format = 'FM'; ds.track = S.station + 1;
+    ds.title = st.name;
+    ds.artist = np ? `${np.artist} - ${np.title}` : (st.genre || 'EN DIRECTO');
+    $('#rdStation').textContent = st.name;
+    $('#rdTitle').textContent = np ? np.title : 'En directo';
+    $('#rdArtist').textContent = np ? np.artist : (st.genre || '');
+    $('#rdGenre').textContent = radio.plain ? 'Sin ecualizador (la emisora no permite procesar el audio)' : (st.genre || '');
+    const img = $('#rdCover');
+    if (np && np.cover) { img.src = np.cover; img.classList.add('show'); } else img.classList.remove('show');
+    const title = np ? `${np.artist} — ${np.title}` : st.name;
+    $('#tbTitle').textContent = `${st.name} · ${title}`;
+    document.title = `${st.name} · NightDrive`;
+    if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: np ? np.title : st.name, artist: np ? np.artist : st.name, album: st.name, artwork: np && np.cover ? [{ src: np.cover }] : [] });
+    if (Native) Native.update({ title: np ? np.title : st.name, artist: (np ? np.artist + ' · ' : '') + st.name, playing: !audio.paused }).catch(() => {});
+    $$('.station').forEach(el => el.classList.toggle('cur', +el.dataset.i === S.station));
+  }
+
+  function radioKeyLabels() {
+    const list = stations();
+    $$('.key.num').forEach(k => {
+      const n = +k.dataset.k;
+      k.querySelector('small').textContent = radio.on ? (list[n - 1] ? list[n - 1].short : '—') : ['RPT', 'RDM', 'SCAN', 'PAUSE', '-10s', '+10s'][n - 1];
+    });
+    $('#kSrc').querySelector('small').textContent = radio.on ? 'RADIO' : 'DISC';
+  }
+
+  function tune(i, autoplay = true) {
+    const list = stations();
+    S.station = (i + list.length) % list.length;
+    const st = station();
+    radio.np = null; radio.retry = 0; radio.plain = false;
+    clearInterval(radio.npTimer);
+    setScan(false);
+    loadSeq++; // invalida cargas de pistas pendientes
+    audio.loadUrl(st.url);
+    showRadioInfo();
+    display.flash(`P${S.station + 1} ${st.short}`, 'SINTONIZANDO…', 1800);
+    refreshNowPlaying();
+    radio.npTimer = setInterval(refreshNowPlaying, 20000);
+    if (autoplay) play();
+    save();
+  }
+
+  function setSource(src) {
+    const toRadio = src === 'radio';
+    if (toRadio === radio.on) return;
+    S.source = src;
+    if (toRadio) {
+      radio.on = true;
+      audio.pause();
+      radioKeyLabels();
+      display.flash('RADIO', 'INTERNET', 1200);
+      tune(S.station || 0, true);
+    } else {
+      radio.on = false;
+      clearInterval(radio.npTimer);
+      audio.pause();
+      if (audio.isPlain) audio.loadUrl('');
+      display.state.radio = false;
+      radioKeyLabels();
+      display.flash('DISC', tracks.length ? `${tracks.length} PISTAS` : 'NO DISC', 1200);
+      renderList(); updateNowPlaying();
+      if (current >= 0) loadTrack(current);
+    }
+    save();
+  }
+
+  // si la emisión se corta o falla: reconectar; si es una emisora sin CORS, plan B
+  function radioError() {
+    if (!radio.on) return;
+    const st = station();
+    if (!radio.plain && radio.retry === 0 && st.custom) {
+      radio.plain = true; radio.retry++;
+      audio.loadPlainUrl(st.url); play(); showRadioInfo();
+      return;
+    }
+    if (radio.retry > 5) { display.flash('SIN SEÑAL', st.short, 3000); return; }
+    radio.retry++;
+    display.flash('RECONECTANDO', st.short, 2000);
+    setTimeout(() => { if (radio.on && station() === st) { radio.plain ? audio.loadPlainUrl(st.url) : audio.loadUrl(st.url); play(); } }, 2500);
+  }
+
+  function buildRadioPanel() {
+    const list = stations();
+    $('#stations').innerHTML = list.map((st, i) => `
+      <button class="station" data-i="${i}">
+        ${i < 6 ? `<span class="st-pre">P${i + 1}</span>` : ''}
+        <span class="st-name">${esc(st.name)}</span>
+        <span class="st-genre">${esc(st.genre || st.url)}</span>
+        <span class="st-np" id="np-${i}"></span>
+        ${st.custom ? `<span class="st-del" data-del="${i}" title="Quitar emisora">✕</span>` : ''}
+      </button>`).join('');
+    $$('.station').forEach(el => el.onclick = e => {
+      const del = e.target.closest('[data-del]');
+      if (del) {
+        const k = +del.dataset.del - STATIONS.length;
+        S.customStations.splice(k, 1);
+        if (S.station >= stations().length) S.station = 0;
+        buildRadioPanel(); radioKeyLabels(); save();
+        return;
+      }
+      if (!radio.on) { S.station = +el.dataset.i; setSource('radio'); }
+      else tune(+el.dataset.i);
+    });
+    showRadioInfo();
+    if (!radio.on) display.state.radio = false;
+    // qué suena ahora en cada emisora
+    list.forEach((st, i) => nowPlaying(st).then(np => { const el = document.getElementById('np-' + i); if (el && np) el.textContent = `♪ ${np.artist} — ${np.title}`; }));
+  }
+
+  function bindRadio() {
+    $('#radioAdd').onsubmit = e => {
+      e.preventDefault();
+      const name = $('#raName').value.trim(), url = $('#raUrl').value.trim();
+      if (!/^https?:\/\//i.test(url)) { display.flash('URL NO VÁLIDA', 'HTTP(S)://…'); return; }
+      S.customStations = S.customStations || [];
+      S.customStations.push({ id: 'c' + Date.now(), name: (name || 'MI EMISORA').toUpperCase(), short: (name || 'MIRADIO').toUpperCase().replace(/\s+/g, '').slice(0, 7), url, genre: url.replace(/^https?:\/\//, '').slice(0, 40), custom: true });
+      $('#raName').value = ''; $('#raUrl').value = '';
+      buildRadioPanel(); radioKeyLabels(); save();
+      display.flash('EMISORA', 'AÑADIDA');
+    };
+    $('#rdPlay').onclick = () => { if (!radio.on) setSource('radio'); else togglePlay(); };
+    setInterval(() => { if ($('#panel-radio').classList.contains('on')) buildRadioPanel(); }, 60000);
   }
 
   // ---------------- volumen / knob ----------------
@@ -698,6 +877,7 @@
     on('bass', S.eqOn && S.bass > 0);
     $$('.key.num').forEach(k => {
       const n = +k.dataset.k;
+      if (radio.on) { k.classList.toggle('on', n - 1 === S.station); return; }
       k.classList.toggle('on', (n === 1 && S.repeat > 0) || (n === 2 && S.shuffle) || (n === 3 && scanMode) || (n === 4 && audio.paused && current >= 0));
     });
     $('#tPlay').textContent = audio.paused ? '▶' : '❚❚';
@@ -741,7 +921,11 @@
     $('#slotFiles').onclick = async () => { await pickFiles(); toggleFaceplate(false); };
     $('#slotFolder').onclick = async () => { await pickFolder(); toggleFaceplate(false); };
     $('#slotEject').onclick = () => { clearList(); };
-    $('#kSrc').onclick = togglePower;
+    // SRC: un toque cambia de fuente (DISC / RADIO); mantener pulsado apaga la pantalla
+    { const k = $('#kSrc'); let tm = 0, long = false;
+      k.addEventListener('pointerdown', () => { long = false; tm = setTimeout(() => { long = true; togglePower(); }, 600); });
+      k.addEventListener('pointerup', () => clearTimeout(tm)); k.addEventListener('pointerleave', () => clearTimeout(tm));
+      k.onclick = () => { if (!long) setSource(radio.on ? 'disc' : 'radio'); }; }
     $('#kDisp').onclick = () => setMode(display.mode + 1);
     $('#display').onclick = () => setMode(display.mode + 1);
     $('#kEq').onclick = () => {
@@ -757,6 +941,7 @@
     };
     $$('.key.num').forEach(k => k.onclick = () => {
       const n = +k.dataset.k;
+      if (radio.on) { if (stations()[n - 1]) tune(n - 1); return; } // presintonías
       if (n === 1) cycleRepeat();
       else if (n === 2) toggleShuffle();
       else if (n === 3) setScan(!scanMode);
@@ -847,20 +1032,21 @@
   audio.addEventListener('play', () => { updateIcons(); nativeUpdate(); });
   audio.addEventListener('pause', () => { updateIcons(); renderList(); save(); nativeUpdate(); });
   audio.addEventListener('playing', renderList);
-  audio.addEventListener('ended', () => next(true));
+  audio.addEventListener('ended', () => { if (radio.on) radioError(); else next(true); });
   audio.addEventListener('loadedmetadata', () => {
+    if (radio.on) return;
     const t = tracks[current];
     if (t && !t.duration) { t.duration = audio.duration; renderList(); }
     display.state.duration = audio.duration;
   });
-  audio.addEventListener('error', () => { if (audio.src) { display.flash('ERROR-23', 'FORMATO NO SOPORTADO'); setTimeout(() => next(true), 1500); } });
+  audio.addEventListener('error', () => { if (radio.on) { if (audio.src) radioError(); return; } if (audio.src) { display.flash('ERROR-23', 'FORMATO NO SOPORTADO'); setTimeout(() => next(true), 1500); } });
 
   // ---------------- bucle de render ----------------
   let lastIllum = 0, lastUi = 0;
   function frame(now) {
     const st = display.state;
     st.time = audio.currentTime || 0;
-    st.duration = audio.duration || (tracks[current] && tracks[current].duration) || 0;
+    st.duration = radio.on ? 0 : (audio.duration || (tracks[current] && tracks[current].duration) || 0);
     if (!powerOff) display.render();
     if ($('#panel-eq').classList.contains('on') && !document.body.classList.contains('compact')) eq.render();
     if (now - lastUi > 100) {
@@ -892,6 +1078,8 @@
     bindTransport();
     bindWindow();
     bindKnob();
+    bindRadio();
+    buildRadioPanel();
     applySkin();
     setVolume(S.volume, true);
     display.mode = S.mode || 0;
@@ -923,6 +1111,8 @@
       if (pending.length) addPaths(pending, true);
     }
     // el AudioContext necesita un gesto del usuario en algunos entornos
+    radioKeyLabels();
+    if (S.source === 'radio') { radio.on = true; radioKeyLabels(); tune(S.station || 0, false); }
     const unlock = () => { engine.resume(); window.removeEventListener('pointerdown', unlock); };
     window.addEventListener('pointerdown', unlock);
     updateIcons();

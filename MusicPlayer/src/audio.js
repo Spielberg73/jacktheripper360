@@ -41,6 +41,7 @@
       const ctx = this.ctx;
       this.el = new Audio();
       this.el.preload = 'auto';
+      this.el.crossOrigin = 'anonymous'; // radios por internet: necesario para el EQ y los visualizadores
       this.source = ctx.createMediaElementSource(this.el);
 
       this.preamp = ctx.createGain();
@@ -132,6 +133,7 @@
       this.volumeStep = step;
       const g = step <= 0 ? 0 : Math.pow(step / 40, 2.2);
       this.master.gain.setTargetAtTime(g, this.ctx.currentTime, 0.03);
+      if (this.media && this.media.plain) this.media.plain.volume = Math.min(1, g);
     }
 
     // Respuesta total de la cadena de EQ (dB) para un array de frecuencias
@@ -204,9 +206,20 @@
     pause() { return this.active.pause(); }
     loadUrl(url) {
       if (this.vgm) { const v = this.vgm; this.active = this.html; v.unload(); }
+      if (this.plain) { this.plain.pause(); this.plain.removeAttribute('src'); }
       this.active = this.html;
       this.html.src = url;
     }
+    // emisoras sin CORS: suenan con un <audio> aparte, sin pasar por el EQ
+    loadPlainUrl(url) {
+      if (!this.plain) { this.plain = new Audio(); this._forward(this.plain); }
+      if (this.vgm) this.vgm.unload();
+      this.html.pause();
+      this.active = this.plain;
+      this.plain.volume = Math.min(1, this.engine.master.gain.value || 0.3);
+      this.plain.src = url;
+    }
+    get isPlain() { return this.active === this.plain; }
     _toChip() {
       const v = this._vgm();
       const wasHtml = this.active === this.html;
