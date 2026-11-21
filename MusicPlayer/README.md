@@ -23,13 +23,12 @@ Reproductor de música para Windows con aspecto de **autorradio 1‑DIN de los 2
 - Limitador al final de la cadena para que los presets extremos no saturen.
 
 **Radio por internet**
-- Funciona como la segunda fuente del frontal: **SRC** cambia entre DISC y RADIO, igual que en el coche.
+- Se enciende con el botón **RADIO** de la barra de reproducción (junto al play), o con **SRC** en el frontal, como en el coche. Ese mismo botón pasa a llamarse **DISC** para volver a tu música.
 - Presintonías en las teclas **1–6**: LOS40 Classic, LOS40, LOS40 Dance, LOS40 Urban, Cadena Dial y Radiolé. En la lista hay también Cadena SER. **◀◀ / ▶▶** pasan a la emisora anterior o siguiente.
 - La pantalla muestra la emisora, el artista y la canción que suenan, con un indicador ON AIR. La pestaña **RADIO** enseña además la carátula y lo que suena ahora en cada emisora.
 - La radio pasa por el ecualizador de 31 bandas y por los visualizadores.
 - Puedes añadir cualquier emisora con la URL de su stream. Si esa emisora no permite procesar su audio, suena igualmente, pero sin ecualizador.
 - Si la conexión se corta, reconecta sola. Si pausas más de 15 s, al volver retoma en directo.
-- Mantener pulsado SRC apaga la pantalla.
 
 **Música de Mega Drive (VGM / VGZ)**
 - Emulación propia del chip FM **Yamaha YM2612** (6 canales, 8 algoritmos, feedback, LFO, modo especial del canal 3 y DAC de samples) y del **PSG SN76489** (3 canales cuadrados + ruido), dentro de un AudioWorklet.

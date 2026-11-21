@@ -726,6 +726,10 @@
       k.querySelector('small').textContent = radio.on ? (list[n - 1] ? list[n - 1].short : '—') : ['RPT', 'RDM', 'SCAN', 'PAUSE', '-10s', '+10s'][n - 1];
     });
     $('#kSrc').querySelector('small').textContent = radio.on ? 'RADIO' : 'DISC';
+    const t = $('#tSrc');
+    t.querySelector('span').textContent = radio.on ? 'DISC' : 'RADIO';
+    t.classList.toggle('on', radio.on);
+    t.title = radio.on ? 'Volver a tu música' : 'Escuchar la radio por internet';
   }
 
   function tune(i, autoplay = true) {
@@ -921,11 +925,9 @@
     $('#slotFiles').onclick = async () => { await pickFiles(); toggleFaceplate(false); };
     $('#slotFolder').onclick = async () => { await pickFolder(); toggleFaceplate(false); };
     $('#slotEject').onclick = () => { clearList(); };
-    // SRC: un toque cambia de fuente (DISC / RADIO); mantener pulsado apaga la pantalla
-    { const k = $('#kSrc'); let tm = 0, long = false;
-      k.addEventListener('pointerdown', () => { long = false; tm = setTimeout(() => { long = true; togglePower(); }, 600); });
-      k.addEventListener('pointerup', () => clearTimeout(tm)); k.addEventListener('pointerleave', () => clearTimeout(tm));
-      k.onclick = () => { if (!long) setSource(radio.on ? 'disc' : 'radio'); }; }
+    // SRC y el botón RADIO de la barra: cambian de fuente (DISC / RADIO)
+    $('#kSrc').onclick = () => setSource(radio.on ? 'disc' : 'radio');
+    $('#tSrc').onclick = () => setSource(radio.on ? 'disc' : 'radio');
     $('#kDisp').onclick = () => setMode(display.mode + 1);
     $('#display').onclick = () => setMode(display.mode + 1);
     $('#kEq').onclick = () => {

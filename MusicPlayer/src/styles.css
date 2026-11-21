@@ -445,3 +445,17 @@ body.playing .np-radio i { animation-play-state: running; }
   .station { min-height: 84px; padding: 10px; }
   .rd-play { grid-column: 2; }
 }
+
+/* botón grande para cambiar entre tu música y la radio */
+.src-toggle { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 17px;
+  border: 1px solid var(--illum); background: linear-gradient(#1c1e24, #101116); color: var(--illum); font: 800 12px var(--ui); letter-spacing: .16em;
+  text-shadow: 0 0 8px var(--illum-soft); box-shadow: 0 0 10px var(--illum-soft); }
+.src-toggle i { width: 14px; height: 10px; border: 2px solid currentColor; border-radius: 2px; position: relative; }
+.src-toggle i::before { content: ''; position: absolute; left: 1px; top: -6px; width: 9px; height: 2px; background: currentColor; transform: rotate(-30deg); transform-origin: left; }
+.src-toggle.on i { border-radius: 50%; width: 12px; height: 12px; }
+.src-toggle.on i::before { display: none; }
+.src-toggle:hover { color: #fff; }
+.src-toggle:active { transform: scale(.96); }
+/* zona táctil más grande para SRC */
+.k-src::after { content: ''; position: absolute; inset: -1.4cqw; border-radius: 50%; }
+@media (max-width: 760px) { .src-toggle { height: 32px; padding: 0 10px; letter-spacing: .1em; font-size: 11px; } }
