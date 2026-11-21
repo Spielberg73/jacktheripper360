@@ -2,8 +2,8 @@
 (function () {
   const W = 256, H = 64;          // resolución en "puntos"
   const GFX_W = 96;               // zona de animación a la izquierda
-  const MODES = ['SPECTRUM', 'LEVEL METER', 'SCOPE', 'SPEAKER', 'TUNNEL', 'FULL SPECTRUM', 'CLOCK', 'FM CHANNELS', 'NIGHT SKY', 'HIGHWAY', 'HARBOR'];
-  const SCENES = new Set(['NIGHT SKY', 'HIGHWAY', 'HARBOR']);
+  const MODES = ['SPECTRUM', 'LEVEL METER', 'SCOPE', 'SPEAKER', 'TUNNEL', 'FULL SPECTRUM', 'CLOCK', 'FM CHANNELS', 'NIGHT SKY', 'HIGHWAY', 'HARBOR', 'RAIN', 'TUNNEL LIGHTS', 'NEON CITY', 'SUNSET'];
+  const SCENES = new Set(['NIGHT SKY', 'HIGHWAY', 'HARBOR', 'RAIN', 'TUNNEL LIGHTS', 'NEON CITY', 'SUNSET']);
   const FONT = 'bold 12px Consolas, "Lucida Console", "Courier New", monospace';
   const FONT_BIG = 'bold 34px Consolas, "Lucida Console", "Courier New", monospace';
 
@@ -131,6 +131,7 @@
       this.au.bass = this.energy;
       this.au.energy += ((this.lvl.L + this.lvl.R) / 2 - this.au.energy) * 0.05;
       this.au.kick = this.energy - prevE > 0.08;
+      this.au.spec = this.spec16;
     }
 
     // ---------- animaciones ----------
@@ -254,7 +255,7 @@
         return;
       }
       const blink = !s.playing && Math.floor(now / 500) % 2 === 1;
-      this.text(s.radio ? `FM P${s.track}` : `${s.format || 'MP3'} T${String(s.track).padStart(2, '0')}`, x0, 1);
+      this.text(s.radio ? (s.track ? `FM P${s.track}` : 'FM --') : `${s.format || 'MP3'} T${String(s.track).padStart(2, '0')}`, x0, 1);
       if (!blink) this.text(this.fmt(s.time), x0 + w - 1, 1, 'right');
       if (msg) {
         this.text(msg.text, x0 + w / 2, msg.sub ? 19 : 26, 'center');
@@ -264,7 +265,7 @@
         this.scrollText(s.artist || '', x0, 38, w, 'a' + s.artist + s.title);
       }
       if (s.radio) { // en directo: indicador de señal en lugar de barra de progreso
-        this.text('ON AIR', x0, 52);
+        if (!s.rec || Math.floor(performance.now() / 500) % 2) this.text(s.rec ? '● REC' : 'ON AIR', x0, 52);
         const lv = Math.max(this.lvl.L, this.lvl.R);
         for (let i = 0; i < 6; i++) { const h = 2 + i * 2; if (lv * 7 > i || i < 2) this.b.fillRect(x0 + w - 30 + i * 5, 63 - h, 3, h); }
         return;

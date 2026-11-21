@@ -116,6 +116,18 @@ ipcMain.handle('fs:read', async (_e, p) => {
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 });
 
+// guarda grabaciones y exportaciones en Música\NightDrive (sin sobrescribir)
+ipcMain.handle('file:save', async (_e, name, bytes) => {
+  const dir = path.join(app.getPath('music'), 'NightDrive');
+  await fs.promises.mkdir(dir, { recursive: true });
+  const safe = String(name || 'archivo').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 150);
+  const ext = path.extname(safe), base = safe.slice(0, safe.length - ext.length);
+  let file = path.join(dir, safe), i = 2;
+  while (fs.existsSync(file)) file = path.join(dir, `${base} (${i++})${ext}`);
+  await fs.promises.writeFile(file, Buffer.from(bytes));
+  return file;
+});
+
 ipcMain.handle('fs:exists', async (_e, p) => {
   try { await fs.promises.access(p); return true; } catch { return false; }
 });

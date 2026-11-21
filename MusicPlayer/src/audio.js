@@ -43,6 +43,13 @@
       this.el.preload = 'auto';
       this.el.crossOrigin = 'anonymous'; // radios por internet: necesario para el EQ y los visualizadores
       this.source = ctx.createMediaElementSource(this.el);
+      // segundo reproductor para el crossfade entre canciones
+      this.el2 = new Audio();
+      this.el2.preload = 'auto';
+      this.el2.crossOrigin = 'anonymous';
+      this.source2 = ctx.createMediaElementSource(this.el2);
+      this.fadeA = ctx.createGain();
+      this.fadeB = ctx.createGain(); this.fadeB.gain.value = 0;
 
       this.preamp = ctx.createGain();
       this.bassBoost = this._shelf('lowshelf', 90);
@@ -66,7 +73,11 @@
       this.anL = ctx.createAnalyser(); this.anL.fftSize = 2048;
       this.anR = ctx.createAnalyser(); this.anR.fftSize = 2048;
 
-      this.source.connect(this.preamp);
+      this.source.connect(this.fadeA); this.fadeA.connect(this.preamp);
+      this.source2.connect(this.fadeB); this.fadeB.connect(this.preamp);
+      // toma de audio para grabar (lo que suena, antes del EQ)
+      this.tap = ctx.createGain();
+      this.fadeA.connect(this.tap); this.fadeB.connect(this.tap);
       this.bassBoost.connect(this.loudLow);
       this.loudLow.connect(this.loudHigh);
       this.loudHigh.connect(this.panner);
@@ -185,11 +196,36 @@
     constructor(engine) {
       super();
       this.engine = engine;
-      this.html = engine.el;
+      this.html = engine.el;            // reproductor HTML en uso (alterna en los crossfades)
+      this.pair = [[engine.el, engine.fadeA], [engine.el2, engine.fadeB]];
       this.vgm = null;
       this.active = this.html;
-      this._forward(this.html);
+      this._forward(engine.el);
+      this._forward(engine.el2);
+      this.fading = null;
     }
+    _gainOf(el) { return this.pair.find(p => p[0] === el)[1].gain; }
+    _other(el) { return this.pair.find(p => p[0] !== el)[0]; }
+    _cancelFade() {
+      if (this.fading) { clearTimeout(this.fading); this.fading = null; }
+      const now = this.engine.ctx.currentTime, other = this._other(this.html);
+      other.pause(); other.removeAttribute('src');
+      for (const [el, g] of this.pair) { g.gain.cancelScheduledValues(now); g.gain.setValueAtTime(el === this.html ? 1 : 0, now); }
+    }
+    // funde la canción actual con `url` durante `secs` segundos
+    crossfadeTo(url, secs) {
+      if (this.vgm && this.active === this.vgm) return this.loadUrl(url);
+      this._cancelFade();
+      const from = this.html, to = this._other(from), ctx = this.engine.ctx, now = ctx.currentTime;
+      to.src = url;
+      const gIn = this._gainOf(to), gOut = this._gainOf(from);
+      gIn.setValueAtTime(0, now); gIn.linearRampToValueAtTime(1, now + secs);
+      gOut.setValueAtTime(1, now); gOut.linearRampToValueAtTime(0, now + secs);
+      this.html = to; this.active = to;
+      this.fading = setTimeout(() => { this.fading = null; from.pause(); from.removeAttribute('src'); }, secs * 1000 + 200);
+      return to.play();
+    }
+    get isFading() { return !!this.fading; }
     _forward(b) { EVENTS.forEach(ev => b.addEventListener(ev, () => { if (this.active === b) this.dispatchEvent(new Event(ev)); })); }
     _vgm() {
       if (!this.vgm) { this.vgm = new window.NDVgm.VgmMedia(this.engine.ctx, this.engine.preamp); this._forward(this.vgm); }
@@ -206,6 +242,7 @@
     pause() { return this.active.pause(); }
     loadUrl(url) {
       if (this.vgm) { const v = this.vgm; this.active = this.html; v.unload(); }
+      this._cancelFade();
       if (this.plain) { this.plain.pause(); this.plain.removeAttribute('src'); }
       this.active = this.html;
       this.html.src = url;
@@ -224,7 +261,7 @@
       const v = this._vgm();
       const wasHtml = this.active === this.html;
       this.active = v;
-      if (wasHtml) { this.html.pause(); this.html.removeAttribute('src'); this.html.load(); }
+      if (wasHtml) { this._cancelFade(); this.html.pause(); this.html.removeAttribute('src'); this.html.load(); }
       return v;
     }
     async loadVgm(buf) { await this._toChip().load(buf); }

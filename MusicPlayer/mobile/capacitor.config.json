@@ -5,6 +5,7 @@
   "backgroundColor": "#07070a",
   "android": {
     "backgroundColor": "#07070a",
-    "adjustMarginsForEdgeToEdge": "force"
+    "adjustMarginsForEdgeToEdge": "force",
+    "allowMixedContent": true
   }
 }

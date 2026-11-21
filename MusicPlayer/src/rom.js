@@ -27,7 +27,7 @@
     });
   }
 
-  const cacheKey = crc => 'ndrom:v2:' + crc;
+  const cacheKey = crc => 'ndrom:v3:' + crc;
   function cached(crc) { try { return JSON.parse(localStorage.getItem(cacheKey(crc)) || 'null'); } catch { return null; } }
   function store(crc, res) { try { localStorage.setItem(cacheKey(crc), JSON.stringify(res)); } catch { } }
 
@@ -38,7 +38,7 @@
     const hit = cached(info.crc);
     if (hit) return hit;
     const res = await call('scan', bytes, {}, onProgress);
-    const out = { crc: res.crc, title: res.title, isMD: true, mode: res.mode, template: res.template, frame: res.frame, reason: res.reason, tracks: res.tracks };
+    const out = { crc: res.crc, title: res.title, serial: res.serial, isMD: true, mode: res.mode, template: res.template, frame: res.frame, reason: res.reason, tracks: res.tracks };
     store(info.crc, out);
     return out;
   }

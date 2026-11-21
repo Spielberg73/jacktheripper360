@@ -111,6 +111,7 @@
     <button class="tbtn big" id="tPlay" title="Play/Pausa">▶</button>
     <button class="tbtn" id="tNext" title="Siguiente">⏭</button>
     <button class="tbtn" id="tStop" title="Stop">■</button>
+    <button class="rec-btn" id="tRec" title="Grabar la radio (se guarda la canción)" hidden><i></i><span>REC</span></button>
     <button class="src-toggle" id="tSrc" title="Cambiar entre tu música y la radio por internet"><i></i><span>RADIO</span></button>
     <span class="ttime" id="tCur">00:00</span>
     <div class="seek" id="seek"><div class="seek-buf"></div><div class="seek-fill" id="seekFill"></div><div class="seek-thumb" id="seekThumb"></div></div>
@@ -168,6 +169,19 @@
           <button class="mbtn danger" id="plClear">VACIAR</button>
           <input type="search" id="plSearch" placeholder="Buscar…">
         </div>
+        <div class="pl-lists">
+          <select id="plSort" title="Ordenar">
+            <option value="orig">Orden: como se añadieron</option><option value="title">Orden: título</option>
+            <option value="artist">Orden: artista</option><option value="album">Orden: álbum</option>
+          </select>
+          <select id="plLists" title="Listas guardadas"></select>
+          <button class="mbtn" id="plLoad">CARGAR</button>
+          <button class="mbtn danger" id="plDel">BORRAR</button>
+          <select id="expFmt" title="Formato de exportación"><option value="mp3">MP3</option><option value="wav">WAV</option></select>
+          <button class="mbtn" id="plExport" title="Exporta las pistas VGM / ROM seleccionadas (o la que suena)">EXPORTAR</button>
+          <input id="plName" placeholder="Nombre de la lista" maxlength="30">
+          <button class="mbtn" id="plSave">GUARDAR LISTA</button>
+        </div>
         <div class="pl-head"><span>#</span><span>TÍTULO</span><span>ARTISTA</span><span>ÁLBUM</span><span>TIEMPO</span></div>
         <div class="pl-list" id="plList"></div>
         <div class="pl-empty" id="plEmpty">Arrastra aquí canciones o carpetas, o pulsa <b>+ ARCHIVOS</b></div>
@@ -185,8 +199,25 @@
         <button class="mbtn rd-play" id="rdPlay">▶ / ❚❚</button>
       </aside>
       <div class="radio-main">
-        <div class="radio-hint">Las teclas <b>1–6</b> del frontal son las presintonías P1–P6 y <b>SRC</b> cambia entre DISC y RADIO.</div>
+        <div class="radio-hint">Las teclas <b>1–6</b> del frontal son las presintonías: <b>mantén pulsada</b> una tecla para guardar ahí la emisora que suena. <b>SRC</b> o el botón <b>RADIO</b> cambian entre tu música y la radio.</div>
         <div class="stations" id="stations"></div>
+        <div class="radio-search">
+          <form id="rsForm" class="rs-form">
+            <input id="rsQuery" placeholder="Buscar emisoras de todo el mundo…" type="search">
+            <select id="rsCountry" title="País">
+              <option value="ES">España</option><option value="">Todo el mundo</option><option value="MX">México</option><option value="AR">Argentina</option>
+              <option value="US">EE. UU.</option><option value="GB">Reino Unido</option><option value="FR">Francia</option><option value="IT">Italia</option>
+              <option value="DE">Alemania</option><option value="PT">Portugal</option><option value="CO">Colombia</option><option value="CL">Chile</option><option value="JP">Japón</option>
+            </select>
+            <button class="mbtn" type="submit">BUSCAR</button>
+          </form>
+          <div class="chips" id="rsTags">
+            <button data-tag="rock">ROCK</button><button data-tag="pop">POP</button><button data-tag="80s">80s</button><button data-tag="90s">90s</button>
+            <button data-tag="dance">DANCE</button><button data-tag="jazz">JAZZ</button><button data-tag="classical">CLÁSICA</button>
+            <button data-tag="flamenco">FLAMENCO</button><button data-tag="news">NOTICIAS</button><button data-tag="chiptune">CHIPTUNE</button>
+          </div>
+          <div class="rs-results" id="rsResults"></div>
+        </div>
         <form class="radio-add" id="radioAdd">
           <input id="raName" placeholder="Nombre de la emisora" maxlength="24">
           <input id="raUrl" placeholder="URL del stream (https://…)" inputmode="url">
@@ -198,6 +229,17 @@
     <!-- FRONTALES -->
     <div class="panel" id="panel-skins">
       <div class="skins" id="skins"></div>
+      <div class="editor" id="editor">
+        <span class="ed-title">EDITOR DE FRONTAL</span>
+        <label>Placa arriba <input type="color" id="edPlateA"></label>
+        <label>Placa abajo <input type="color" id="edPlateB"></label>
+        <label>Acabado <select id="edFinish"><option value="gloss">Brillo</option><option value="brushed">Aluminio cepillado</option><option value="carbon">Fibra de carbono</option></select></label>
+        <label>Teclas <input type="color" id="edIllum"></label>
+        <label>Pantalla <input type="color" id="edDispA"></label>
+        <label>Pantalla (degradado) <input type="color" id="edDispB"></label>
+        <label>Logo <input type="color" id="edBrand"></label>
+        <button class="mbtn" id="edSave">GUARDAR COMO MI FRONTAL</button>
+      </div>
       <div class="skin-opts">
         <div class="opt">
           <span>ILUMINACIÓN DE TECLAS</span>
@@ -211,6 +253,18 @@
         <div class="opt" id="optAwake" hidden>
           <span>PANTALLA</span>
           <label class="chk"><input type="checkbox" id="keepAwake"> Mantener siempre encendida</label>
+        </div>
+        <div class="opt">
+          <span>SONIDOS DE LA AUTORRADIO</span>
+          <label class="chk"><input type="checkbox" id="optChime" checked> Pitido al arrancar y al apagar</label>
+        </div>
+        <div class="opt">
+          <span>CROSSFADE ENTRE CANCIONES <output id="oXfade">6 s</output></span>
+          <input type="range" id="xfade" min="0" max="12" step="1" value="6">
+        </div>
+        <div class="opt">
+          <span>MODO NOCHE</span>
+          <div class="chips" id="nightChips"><button data-v="auto">AUTO (PUESTA DE SOL)</button><button data-v="on">SIEMPRE</button><button data-v="off">NUNCA</button></div>
         </div>
         <div class="opt">
           <span>DIMMER</span>
@@ -231,6 +285,7 @@
 <script src="audio.js"></script>
 <script src="vgm.js"></script>
 <script src="zip.js"></script>
+<script src="md/titles.js"></script>
 <script src="rom.js"></script>
 <script src="drive.js"></script>
 <script src="scenes.js"></script>

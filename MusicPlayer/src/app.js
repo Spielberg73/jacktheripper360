@@ -60,17 +60,22 @@
   const DEFAULTS = {
     skin: 'stealth', illAuto: true, illHue: 0, dispColor: 'auto', dimmer: 1, mode: 0,
     volume: 20, bands: 31, gains: null, preset: 'FLAT', preamp: 0, bass: 0, loud: 0, balance: 0, eqOn: true,
-    custom: { C1: null, C2: null }, source: 'disc', station: 0, customStations: [], repeat: 0, shuffle: false, playlist: [], current: -1, position: 0, tab: 'eq', onTop: false
+    custom: { C1: null, C2: null }, crossfade: 6, night: 'auto', lists: [], source: 'disc', station: 0, customStations: [], repeat: 0, shuffle: false, playlist: [], current: -1, position: 0, tab: 'eq', onTop: false
   };
   let S;
   try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('nightdrive') || '{}')); } catch { S = { ...DEFAULTS }; }
   let saveTimer = 0;
+  // pistas -> datos guardables (rutas en el PC, biblioteca interna en el móvil)
+  function serializeTracks(list) {
+    if (!(nd || lib)) return [];
+    const keep = t => !t.scanning && (nd ? t.path : t.lib);
+    return list.filter(keep).map(t => ({ path: t.path, lib: t.lib, entry: t.entry, zip: t.zip, tagged: t.tagged, rom: t.rom, title: t.title, artist: t.artist, album: t.album, duration: t.duration, name: t.name, codec: t.codec, bitrate: t.bitrate, sampleRate: t.sampleRate, system: t.system }));
+  }
   function save(now) {
     clearTimeout(saveTimer);
     const write = () => {
       try {
-        const keep = t => !t.scanning && (nd ? t.path : t.lib);
-        const out = { ...S, playlist: (nd || lib) ? tracks.filter(keep).map(t => ({ path: t.path, lib: t.lib, entry: t.entry, zip: t.zip, tagged: t.tagged, rom: t.rom, title: t.title, artist: t.artist, album: t.album, duration: t.duration, name: t.name, codec: t.codec, bitrate: t.bitrate, sampleRate: t.sampleRate, system: t.system })) : [] };
+        const out = { ...S, playlist: serializeTracks(tracks) };
         out.position = engine.media.currentTime || 0;
         out.current = current;
         localStorage.setItem('nightdrive', JSON.stringify(out));
@@ -97,6 +102,76 @@
   let filter = '';
 
   // ---------------- skins ----------------
+  // pitidos de autorradio (arranque y apagado), sintetizados
+  function chime(notes) {
+    if (S.chime === false) return;
+    const ctx = engine.ctx;
+    const go = () => {
+      let t = ctx.currentTime + 0.03;
+      for (const [f, d] of notes) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'square'; o.frequency.value = f;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0008, t + d);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(t); o.stop(t + d + 0.02);
+        t += d * 0.9;
+      }
+    };
+    if (ctx.state === 'running') go(); else ctx.resume().then(go).catch(() => {});
+  }
+  const bootChime = () => chime([[1046, 0.09], [1568, 0.16]]);
+  const byeChime = () => chime([[1568, 0.09], [784, 0.2]]);
+  // apaga con estilo: el frontal se suelta y cae, y después se cierra la app
+  function shutDown(then) {
+    byeChime();
+    display.flash('SEE YOU', 'NIGHTDRIVE', 2000);
+    audio.pause();
+    save(true);
+    if (window.NDDrive) window.NDDrive.stop();
+    setTimeout(() => $('#plate').classList.add('ejecting'), 350);
+    setTimeout(then, 1300);
+  }
+
+  // frontal personalizado (editor)
+  const FINISH = {
+    gloss: (a, b) => `linear-gradient(180deg,${a} 0%,${mix(a, b, .55)} 46%,${b} 100%)`,
+    brushed: (a, b) => `repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,rgba(0,0,0,.05) 1px 3px),linear-gradient(180deg,${a} 0%,${mix(a, b, .5)} 48%,${b} 100%)`,
+    carbon: (a, b) => `radial-gradient(rgba(0,0,0,.55) 15%,transparent 16%) 0 0/12px 12px,radial-gradient(rgba(0,0,0,.55) 15%,transparent 16%) 6px 6px/12px 12px,radial-gradient(rgba(255,255,255,.09) 15%,transparent 20%) 0 1px/12px 12px,radial-gradient(rgba(255,255,255,.09) 15%,transparent 20%) 6px 7px/12px 12px,linear-gradient(180deg,${a},${b})`
+  };
+  function mix(a, b, k) {
+    const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const x = p(a), y = p(b);
+    return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join('');
+  }
+  const lum = h => { const v = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+  function customSkin(c) {
+    return { id: 'custom', name: 'MI FRONTAL', desc: 'Diseñado por ti', plate: (FINISH[c.finish] || FINISH.gloss)(c.plateA, c.plateB),
+      edge: mix(c.plateB, '#000000', .6), illum: c.illum, disp: [c.dispA, c.dispB], brand: c.brand,
+      key: [mix(c.plateB, '#ffffff', .12), mix(c.plateB, '#000000', .55)], light: lum(mix(c.plateA, c.plateB, .5)) > 0.45 };
+  }
+  function installCustomSkin() {
+    const i = SKINS.findIndex(s => s.id === 'custom');
+    if (i >= 0) SKINS.splice(i, 1);
+    if (S.customSkin) SKINS.push(customSkin(S.customSkin));
+  }
+  function bindEditor() {
+    const c = S.customSkin || { plateA: '#2c2c31', plateB: '#050506', finish: 'gloss', illum: '#ff2a2a', dispA: '#ffb300', dispB: '#ff5a00', brand: '#e9ebef' };
+    const ids = { plateA: '#edPlateA', plateB: '#edPlateB', illum: '#edIllum', dispA: '#edDispA', dispB: '#edDispB', brand: '#edBrand' };
+    for (const [k, sel] of Object.entries(ids)) $(sel).value = c[k];
+    $('#edFinish').value = c.finish;
+    const read = () => ({ ...Object.fromEntries(Object.entries(ids).map(([k, sel]) => [k, $(sel).value])), finish: $('#edFinish').value });
+    // vista previa en directo
+    const preview = () => {
+      S.customSkin = read();
+      installCustomSkin();
+      S.skin = 'custom'; S.illAuto = true; S.dispColor = 'auto';
+      $('#illAuto').checked = true;
+      applySkin();
+    };
+    $$('#editor input, #editor select').forEach(el => el.addEventListener('input', preview));
+    $('#edSave').onclick = () => { preview(); buildSkinPanel(); applySkin(); save(); display.flash('MI FRONTAL', 'GUARDADO'); };
+  }
+
   function currentSkin() { return SKINS.find(s => s.id === S.skin) || SKINS[0]; }
   function applySkin() {
     const sk = currentSkin();
@@ -136,7 +211,7 @@
     r.setProperty('--disp-a', rainbow ? '#ffffff' : c[0]);
     r.setProperty('--disp-b', rainbow ? '#ff00aa' : c[1]);
     display.setColors(c[0], c[1], rainbow);
-    display.brightness = S.dimmer;
+    display.brightness = nightState ? Math.min(S.dimmer, 0.55) : S.dimmer;
     eq.setColors(toHex(illumColor()), toHex(c[0]));
   }
   const _cv = document.createElement('canvas').getContext('2d');
@@ -166,8 +241,14 @@
       $('#keepAwake').checked = !!S.keepAwake;
       $('#keepAwake').onchange = e => { S.keepAwake = e.target.checked; Native.keepAwake({ on: S.keepAwake || document.body.classList.contains('compact') }).catch(() => {}); save(); };
     }
+    $('#optChime').checked = S.chime !== false;
+    $('#optChime').onchange = e => { S.chime = e.target.checked; save(); if (S.chime) bootChime(); };
+    $('#xfade').value = S.crossfade || 0;
+    $('#oXfade').textContent = S.crossfade ? S.crossfade + ' s' : 'OFF';
+    $('#xfade').oninput = e => { S.crossfade = +e.target.value; $('#oXfade').textContent = S.crossfade ? S.crossfade + ' s' : 'OFF'; save(); };
     $('#dimmer').value = S.dimmer;
-    $('#dimmer').oninput = e => { S.dimmer = +e.target.value; display.brightness = S.dimmer; save(); };
+    $('#dimmer').oninput = e => { S.dimmer = +e.target.value; applyNight(true); save(); };
+    $$('#nightChips button').forEach(b => b.onclick = () => { S.night = b.dataset.v; applyNight(true); save(); });
     refreshChips();
   }
   function refreshChips() {
@@ -308,14 +389,14 @@
     return out;
   }
 
-  async function addSources(srcs, playFirst) {
+  async function addSources(srcs, playFirst, noAutoplay) {
     const fresh = await expandSources(srcs);
     if (!fresh.length) { display.flash('SIN AUDIO', 'NADA QUE AÑADIR'); return; }
     const start = tracks.length;
     tracks.push(...fresh);
     renderList();
     display.flash(`+${fresh.length} PISTAS`, 'AÑADIDAS');
-    if (playFirst || current < 0) playIndex(start);
+    if (playFirst || (current < 0 && !noAutoplay && !radio.on)) playIndex(start);
     // etiquetas: VGM (GD3) y audio suelto (Electron). El audio dentro de ZIP se etiqueta al reproducirlo.
     for (const t of fresh.filter(t => isVgm(t.name))) {
       try { await applyVgmInfo(t, await readTrackBytes(t)); } catch { /* VGM dañado */ }
@@ -345,7 +426,9 @@
     const base = { id: uid++, path: src.path, file: src.file, lib: src.lib, entry: src.entry, zip: src.zip, name: src.name, album: res.title, system: 'Mega Drive', codec: 'ROM · 68000 + Z80 + YM2612 + PSG' };
     if (!t) return { ...base, title: res.title + ' (modo libre)', artist: 'Arranque del juego', duration: 180, rom: { crc: res.crc, free: true } };
     const n = String(i + 1).padStart(2, '0');
-    return { ...base, title: (t.kind === 'jingle' ? 'Jingle ' : 'Track ') + n, artist: 'Mega Drive · ID ' + t.value.toString(16).toUpperCase() + 'h',
+    // título: el que le diste tú > base de datos de juegos conocidos > "Track NN"
+    const named = (S.romTitles || {})[res.crc + ':' + t.value] || (window.NDTitles && window.NDTitles.lookup(res.serial, t.value));
+    return { ...base, title: named || (t.kind === 'jingle' ? 'Jingle ' : 'Track ') + n, artist: 'Mega Drive · ID ' + t.value.toString(16).toUpperCase() + 'h',
       duration: t.kind === 'jingle' ? t.length : 150, rom: { crc: res.crc, template: res.template, frame: res.frame, value: t.value, jingle: t.kind === 'jingle' } };
   }
   async function scanRomTrack(ph) {
@@ -392,9 +475,9 @@
     t.codec = m.codec;
     t.system = m.system;
   }
-  function addPaths(paths, playFirst) {
+  function addPaths(paths, playFirst, noAutoplay) {
     if (!paths || !paths.length) return;
-    return addSources(paths.map(p => ({ path: p })), playFirst);
+    return addSources(paths.map(p => ({ path: p })), playFirst, noAutoplay);
   }
   function addFiles(files, playFirst) {
     const list = [...files].filter(f => f.type.startsWith('audio') || PLAYABLE_RE.test(f.name) || isZip(f.name) || isRom(f.name));
@@ -472,11 +555,61 @@
     $('#plRemove').onclick = removeSelected;
     $('#plClear').onclick = clearList;
     $('#plSearch').oninput = e => { filter = e.target.value; renderList(); };
+    bindLists();
+    bindRename();
+    $('#plExport').onclick = exportTracks;
     $('#fileInput').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
   }
+  // ---- listas guardadas y ordenación ----
+  function refreshLists() {
+    const sel = $('#plLists');
+    sel.innerHTML = '<option value="">— Listas guardadas —</option>' + (S.lists || []).map((l, i) => `<option value="${i}">${esc(l.name)} (${l.items.length})</option>`).join('');
+  }
+  function sortTracks(key) {
+    if (!tracks.length) return;
+    const cur = tracks[current];
+    const val = t => key === 'title' ? t.title : key === 'artist' ? `${t.artist} ${t.album} ${t.title}` : key === 'album' ? `${t.album} ${t.name}` : '';
+    if (key === 'orig') tracks.sort((a, b) => a.id - b.id);
+    else tracks.sort((a, b) => String(val(a) || '').localeCompare(String(val(b) || ''), 'es', { numeric: true, sensitivity: 'base' }));
+    current = cur ? tracks.indexOf(cur) : -1;
+    reshuffle(); renderList(); save();
+  }
+  function bindLists() {
+    refreshLists();
+    $('#plSort').onchange = e => { sortTracks(e.target.value); display.flash('ORDEN', e.target.selectedOptions[0].textContent.toUpperCase()); };
+    $('#plSave').onclick = () => {
+      const name = $('#plName').value.trim() || `Lista ${(S.lists || []).length + 1}`;
+      const items = serializeTracks(tracks);
+      if (!items.length) { display.flash('LISTA VACÍA', 'AÑADE CANCIONES'); return; }
+      S.lists = (S.lists || []).filter(l => l.name !== name);
+      S.lists.push({ name, items, at: Date.now() });
+      $('#plName').value = '';
+      refreshLists(); save();
+      display.flash('GUARDADA', name.toUpperCase().slice(0, 20));
+    };
+    $('#plLoad').onclick = () => {
+      const l = (S.lists || [])[+$('#plLists').value];
+      if (!l) { display.flash('ELIGE UNA', 'LISTA GUARDADA'); return; }
+      stop();
+      tracks = l.items.map(t => ({ id: uid++, ...t }));
+      current = -1; selected.clear();
+      renderList(); reshuffle(); updateNowPlaying(); save();
+      display.flash(l.name.toUpperCase().slice(0, 20), `${tracks.length} PISTAS`);
+      if (tracks.length) playIndex(0);
+    };
+    $('#plDel').onclick = () => {
+      const i = $('#plLists').value;
+      if (i === '') return;
+      const [l] = S.lists.splice(+i, 1);
+      refreshLists(); save(); libraryCleanup();
+      display.flash('BORRADA', l.name.toUpperCase().slice(0, 20));
+    };
+  }
+
   function libraryCleanup() {
     if (!lib) return;
     const used = new Set(tracks.map(t => t.lib).filter(Boolean));
+    for (const pl of S.lists || []) for (const t of pl.items) if (t.lib) used.add(t.lib); // listas guardadas
     lib.keys().then(keys => keys.forEach(k => { if (!used.has(k)) lib.del(k); })).catch(() => {});
   }
   function removeSelected() {
@@ -585,6 +718,77 @@
     }
     playIndex(n);
   }
+  // ---- modo noche: atenúa el frontal y la pantalla entre la puesta y la salida del sol ----
+  function sunTimesUTC(lat, lon, date = new Date()) {
+    const start = Date.UTC(date.getUTCFullYear(), 0, 0);
+    const n = Math.floor((date - start) / 86400000);
+    const r = Math.PI / 180;
+    const decl = -23.44 * Math.cos(r * 360 / 365 * (n + 10));
+    const x = -Math.tan(lat * r) * Math.tan(decl * r);
+    const h = Math.acos(Math.max(-1, Math.min(1, x))) / r; // semiarco diurno en grados
+    const noon = 12 - lon / 15;
+    return { rise: noon - h / 15, set: noon + h / 15 };
+  }
+  function isNightNow() {
+    if (S.night === 'on') return true;
+    if (S.night === 'off') return false;
+    let pos = null;
+    try { pos = JSON.parse(localStorage.getItem('nd-pos') || 'null'); } catch { }
+    const [lat, lon] = pos || [40.4, -3.7]; // sin GPS: España
+    const now = new Date(), u = now.getUTCHours() + now.getUTCMinutes() / 60;
+    const { rise, set } = sunTimesUTC(lat, lon, now);
+    return u < rise - 0.25 || u > set + 0.25;
+  }
+  let nightState = null;
+  function applyNight(force) {
+    const on = isNightNow();
+    if (on === nightState && !force) return;
+    const changed = nightState !== null && on !== nightState;
+    nightState = on;
+    document.body.classList.toggle('night', on);
+    display.brightness = on ? Math.min(S.dimmer, 0.55) : S.dimmer;
+    if (changed) display.flash(on ? 'MODO NOCHE' : 'MODO DIA', on ? 'DIMMER ON' : 'DIMMER OFF', 1500);
+    $$('#nightChips button').forEach(b => b.classList.toggle('on', b.dataset.v === (S.night || 'auto')));
+  }
+
+  // ---- crossfade: funde el final de una canción con el principio de la siguiente ----
+  let xfBusy = false;
+  function peekNext() {
+    if (!tracks.length || S.repeat === 1) return -1;
+    if (S.shuffle) {
+      const n = order[order.indexOf(current) + 1];
+      return n !== undefined ? n : (S.repeat === 2 ? order[0] : -1);
+    }
+    const n = current + 1;
+    return n < tracks.length ? n : (S.repeat === 2 ? 0 : -1);
+  }
+  const plainAudio = t => t && !t.rom && !t.scanning && !isVgm(t.name);
+  function checkCrossfade() {
+    const cf = S.crossfade || 0;
+    if (!cf || radio.on || xfBusy || audio.paused || scanMode || audio.isVgm || audio.isPlain || audio.isFading) return;
+    if (!plainAudio(tracks[current])) return;
+    const d = audio.duration, left = d - audio.currentTime;
+    if (!isFinite(d) || d < cf * 2 + 4 || left > cf) return;
+    const n = peekNext();
+    if (n < 0 || !plainAudio(tracks[n])) return;
+    xfBusy = true;
+    doCrossfade(n, Math.max(1, left)).catch(e => console.warn(e)).finally(() => { xfBusy = false; });
+  }
+  async function doCrossfade(n, secs) {
+    const seq = ++loadSeq;
+    const bytes = await readTrackBytes(tracks[n]);
+    if (seq !== loadSeq || audio.paused) return;
+    const url = URL.createObjectURL(new Blob([bytes], { type: mimeFor(tracks[n].name) }));
+    const old = curUrl;
+    curUrl = url;
+    current = n;
+    renderList(); updateNowPlaying();
+    display.flash('CROSSFADE', Math.round(secs) + ' s', 1200);
+    await audio.crossfadeTo(url, secs);
+    setTimeout(() => { if (old && old !== curUrl) URL.revokeObjectURL(old); }, secs * 1000 + 1000);
+    save();
+  }
+
   function prev() {
     if (radio.on) return tune(S.station - 1);
     if (!tracks.length) return;
@@ -630,6 +834,31 @@
     else if (action === 'playpause') togglePlay(); else if (action === 'next') next(); else if (action === 'prev') prev();
   });
 
+  function bindRename() {
+    const el = $('#npTitle');
+    el.title = 'Toca para renombrar';
+    el.onclick = () => {
+      const t = tracks[current];
+      if (!t || radio.on || el.isContentEditable) return;
+      el.contentEditable = 'true'; el.classList.add('editing'); el.focus();
+      const r = document.createRange(); r.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    };
+    const done = commit => {
+      if (!el.isContentEditable) return;
+      el.contentEditable = 'false'; el.classList.remove('editing');
+      const t = tracks[current], name = el.textContent.trim();
+      if (commit && t && name && name !== t.title) {
+        t.title = name;
+        if (t.rom && !t.rom.free) { S.romTitles = S.romTitles || {}; S.romTitles[t.rom.crc + ':' + t.rom.value] = name; }
+        renderList(); save();
+        display.flash('RENOMBRADA', name.slice(0, 20).toUpperCase(), 1500);
+      }
+      updateNowPlaying();
+    };
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); done(true); } else if (e.key === 'Escape') done(false); e.stopPropagation(); });
+    el.addEventListener('blur', () => done(true));
+  }
+
   async function updateNowPlaying() {
     if (radio.on) return showRadioInfo();
     nativeUpdate();
@@ -674,6 +903,12 @@
   ].map(s => ({ ...s, url: STW(s.mount) }));
   const radio = { on: false, np: null, npTimer: 0, retry: 0, pausedAt: 0, plain: false };
   const stations = () => [...STATIONS, ...(S.customStations || [])];
+  // presintonías: la tecla n guarda el id de una emisora (por defecto, las seis primeras)
+  function presetStation(n) {
+    const list = stations(), id = (S.presets || [])[n - 1];
+    return (id && list.find(s => s.id === id)) || list[n - 1] || null;
+  }
+  function presetOf(st) { for (let n = 1; n <= 6; n++) if (presetStation(n) === st) return n; return 0; }
   const station = () => stations()[S.station] || stations()[0];
 
   async function nowPlaying(st) {
@@ -694,6 +929,8 @@
     const np = await nowPlaying(st);
     if (!radio.on || st !== station()) return;
     const changed = JSON.stringify(np) !== JSON.stringify(radio.np);
+    if (changed && rec.on && rec.np && np) { radio.np = np; stopRec('song'); }
+    else if (rec.on && !rec.np && np) rec.np = np;
     radio.np = np;
     showRadioInfo();
     if (changed && np) display.flash(np.artist.toUpperCase().slice(0, 20) || 'ON AIR', np.title.toUpperCase().slice(0, 20), 2500);
@@ -703,7 +940,7 @@
     const st = station(), np = radio.np;
     const ds = display.state;
     ds.radio = true; ds.hasDisc = true;
-    ds.format = 'FM'; ds.track = S.station + 1;
+    ds.format = 'FM'; ds.track = presetOf(st);
     ds.title = st.name;
     ds.artist = np ? `${np.artist} - ${np.title}` : (st.genre || 'EN DIRECTO');
     $('#rdStation').textContent = st.name;
@@ -721,10 +958,11 @@
   }
 
   function radioKeyLabels() {
+    updateRecUI();
     const list = stations();
     $$('.key.num').forEach(k => {
       const n = +k.dataset.k;
-      k.querySelector('small').textContent = radio.on ? (list[n - 1] ? list[n - 1].short : '—') : ['RPT', 'RDM', 'SCAN', 'PAUSE', '-10s', '+10s'][n - 1];
+      k.querySelector('small').textContent = radio.on ? (presetStation(n) ? presetStation(n).short : '—') : ['RPT', 'RDM', 'SCAN', 'PAUSE', '-10s', '+10s'][n - 1];
     });
     $('#kSrc').querySelector('small').textContent = radio.on ? 'RADIO' : 'DISC';
     const t = $('#tSrc');
@@ -734,6 +972,7 @@
   }
 
   function tune(i, autoplay = true) {
+    if (rec.on) stopRec('user');
     const list = stations();
     S.station = (i + list.length) % list.length;
     const st = station();
@@ -793,7 +1032,7 @@
     const list = stations();
     $('#stations').innerHTML = list.map((st, i) => `
       <button class="station" data-i="${i}">
-        ${i < 6 ? `<span class="st-pre">P${i + 1}</span>` : ''}
+        ${presetOf(st) ? `<span class="st-pre">P${presetOf(st)}</span>` : ''}
         <span class="st-name">${esc(st.name)}</span>
         <span class="st-genre">${esc(st.genre || st.url)}</span>
         <span class="st-np" id="np-${i}"></span>
@@ -811,13 +1050,212 @@
       if (!radio.on) { S.station = +el.dataset.i; setSource('radio'); }
       else tune(+el.dataset.i);
     });
-    showRadioInfo();
-    if (!radio.on) display.state.radio = false;
+    if (radio.on) showRadioInfo();
     // qué suena ahora en cada emisora
     list.forEach((st, i) => nowPlaying(st).then(np => { const el = document.getElementById('np-' + i); if (el && np) el.textContent = `♪ ${np.artist} — ${np.title}`; }));
   }
 
+  // ---- buscador de emisoras de todo el mundo (directorio abierto Radio Browser) ----
+  const RB = ['https://de1.api.radio-browser.info', 'https://fi1.api.radio-browser.info', 'https://de2.api.radio-browser.info'];
+  let rbResults = [];
+  async function rbFetch(path) {
+    for (const host of RB) {
+      try {
+        const r = await fetch(host + path, { headers: { Accept: 'application/json' } });
+        if (r.ok) return await r.json();
+      } catch { /* probar el siguiente servidor */ }
+    }
+    throw new Error('Sin conexión con el directorio de radios');
+  }
+  function rbStation(r) {
+    const tags = (r.tags || '').split(',').filter(Boolean).slice(0, 3).join(', ');
+    const name = (r.name || 'RADIO').trim().replace(/\s+/g, ' ');
+    return {
+      id: 'rb-' + r.stationuuid, name: name.toUpperCase().slice(0, 40), short: name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7) || 'RADIO',
+      url: r.url_resolved || r.url, genre: [r.countrycode, tags, r.codec && r.bitrate ? `${r.codec} ${r.bitrate}k` : r.codec].filter(Boolean).join(' · '),
+      custom: true
+    };
+  }
+  async function searchStations(query, tag) {
+    const country = $('#rsCountry').value;
+    const q = new URLSearchParams({ limit: '40', hidebroken: 'true', order: 'clickcount', reverse: 'true' });
+    if (query) q.set('name', query);
+    if (tag) q.set('tag', tag);
+    if (country) q.set('countrycode', country);
+    const box = $('#rsResults');
+    box.innerHTML = '<div class="rs-msg">Buscando…</div>';
+    try {
+      const list = await rbFetch('/json/stations/search?' + q);
+      rbResults = list.filter(r => (r.url_resolved || r.url) && !/\.m3u8($|\?)/i.test(r.url_resolved || r.url)).map(rbStation);
+      if (!rbResults.length) { box.innerHTML = '<div class="rs-msg">No se encontró ninguna emisora.</div>'; return; }
+      box.innerHTML = rbResults.map((st, i) => `
+        <div class="rs-row"><div class="rs-info"><b>${esc(st.name)}</b><small>${esc(st.genre)}</small></div>
+        <button class="mbtn" data-play="${i}" title="Escuchar">▶</button><button class="mbtn" data-add="${i}" title="Añadir a mis emisoras">＋</button></div>`).join('');
+    } catch (e) { box.innerHTML = `<div class="rs-msg">${esc(e.message)}</div>`; }
+  }
+  function addStation(st) {
+    S.customStations = S.customStations || [];
+    let i = stations().findIndex(x => x.id === st.id || x.url === st.url);
+    if (i < 0) { S.customStations.push(st); i = stations().length - 1; buildRadioPanel(); radioKeyLabels(); save(); }
+    return i;
+  }
+
+  // ---- guardar archivos generados (grabaciones de radio y exportaciones) ----
+  // PC: Música\NightDrive · móvil: biblioteca de la app + carpeta Descargas · navegador: descarga
+  async function storeOutput(name, blob) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    if (nd && nd.saveFile) {
+      const file = await nd.saveFile(name, bytes);
+      await addPaths([file], false, true);
+      return file;
+    }
+    if (Native) {
+      try {
+        let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        await Native.saveToDownloads({ name, mime: blob.type || 'audio/mpeg', data: btoa(bin) });
+      } catch (e) { console.warn('Descargas', e); }
+    } else if (!lib) {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    }
+    if (lib) {
+      const f = new File([blob], name, { type: blob.type });
+      const key = await lib.add(f);
+      await addSources([{ file: f, lib: key }], false, true);
+    }
+    return name;
+  }
+  const safeName = s => String(s).replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 120);
+
+  // ---- worker de audio (MP3): grabaciones de radio y exportaciones ----
+  let mp3w = null, mp3Seq = 0;
+  const mp3Pending = new Map();
+  function audioWorker() {
+    if (mp3w) return mp3w;
+    mp3w = new Worker('mp3-worker.js');
+    mp3w.onmessage = e => {
+      const m = e.data, p = mp3Pending.get(m.id);
+      if (!p) return;
+      if (m.type === 'progress') { if (p.onProgress) p.onProgress(m.p); return; }
+      mp3Pending.delete(m.id);
+      m.type === 'error' ? p.reject(new Error(m.message)) : p.resolve(m.blob);
+    };
+    return mp3w;
+  }
+  function workerJob(msg, transfer, onProgress) {
+    const id = ++mp3Seq;
+    return new Promise((resolve, reject) => {
+      mp3Pending.set(id, { resolve, reject, onProgress });
+      audioWorker().postMessage({ ...msg, id }, transfer || []);
+    });
+  }
+
+  // ---- exportar canciones de VGM y de ROMs de Mega Drive a MP3 o WAV ----
+  let exporting = false;
+  async function exportTracks() {
+    if (exporting) return;
+    const chip = t => t && !t.scanning && (t.rom || isVgm(t.name));
+    let list = tracks.filter(t => selected.has(t.id) && chip(t));
+    if (!list.length && chip(tracks[current])) list = [tracks[current]];
+    if (!list.length) { display.flash('SELECCIONA', 'PISTAS VGM O ROM', 2500); return; }
+    const fmt = $('#expFmt').value;
+    exporting = true;
+    $('#plExport').disabled = true;
+    try {
+      for (let k = 0; k < list.length; k++) {
+        const t = list[k];
+        const bytes = await readTrackBytes(t);
+        let msg, transfer;
+        if (t.rom) {
+          const snap = t.rom.free ? null : await window.NDRom.snapshot(bytes, t.rom);
+          const rom = bytes.slice().buffer;
+          msg = { type: 'export', kind: 'rom', cfg: { rom, snapshot: snap, template: t.rom.template, value: t.rom.value, duration: t.duration || 150, jingle: !!t.rom.jingle } };
+          transfer = [rom];
+        } else {
+          const d = await window.NDVgm.decompress(bytes);
+          const data = d.slice().buffer;
+          msg = { type: 'export', kind: 'vgm', data };
+          transfer = [data];
+        }
+        msg.format = fmt;
+        const label = `${k + 1}/${list.length}`;
+        const blob = await workerJob(msg, transfer, p => {
+          display.flash('EXPORTANDO ' + label, Math.round(p * 100) + '%', 1500);
+          $('#plExport').textContent = `${label} · ${Math.round(p * 100)}%`;
+        });
+        const name = safeName(`${t.album ? t.album + ' - ' : ''}${t.title}`) + '.' + fmt;
+        await storeOutput(name, blob);
+      }
+      display.flash('EXPORTADO', `${list.length} ${list.length === 1 ? 'PISTA' : 'PISTAS'} ${fmt.toUpperCase()}`, 2500);
+    } catch (e) {
+      console.error(e);
+      display.flash('ERROR', 'AL EXPORTAR', 2500);
+    } finally {
+      exporting = false;
+      $('#plExport').disabled = false;
+      $('#plExport').textContent = 'EXPORTAR';
+    }
+  }
+
+  // ---- grabar la radio: se captura lo que suena y se codifica a MP3 (192 kbps) ----
+  // (los servidores de muchas emisoras cortan las descargas directas desde el navegador)
+  const rec = { on: false, t0: 0, np: null, st: null, frames: 0, timer: 0 };
+  let recNode = null;
+  async function ensureRecNode() {
+    if (recNode) return recNode;
+    await engine.ctx.audioWorklet.addModule('rec-worklet.js');
+    recNode = new AudioWorkletNode(engine.ctx, 'rec-tap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+    const mute = engine.ctx.createGain(); mute.gain.value = 0;
+    engine.tap.connect(recNode); recNode.connect(mute); mute.connect(engine.ctx.destination);
+    recNode.port.onmessage = e => {
+      if (e.data.type === 'pcm') { rec.frames += e.data.l.length; audioWorker().postMessage({ type: 'pcm', l: e.data.l, r: e.data.r }, [e.data.l.buffer, e.data.r.buffer]); }
+      else if (e.data.type === 'flushed' && rec.onFlushed) { const f = rec.onFlushed; rec.onFlushed = null; f(); }
+    };
+    return recNode;
+  }
+  async function startRec() {
+    if (!radio.on || rec.on) return;
+    if (audio.isPlain) { display.flash('NO SE PUEDE', 'GRABAR ESTA RADIO', 2500); return; }
+    try { await ensureRecNode(); } catch (e) { console.error(e); display.flash('NO SE PUEDE', 'GRABAR', 2500); return; }
+    audioWorker().postMessage({ type: 'start', sampleRate: engine.ctx.sampleRate, kbps: 192 });
+    Object.assign(rec, { on: true, t0: Date.now(), np: radio.np, st: station(), frames: 0 });
+    recNode.port.postMessage({ type: 'on' });
+    rec.timer = setInterval(updateRecUI, 1000);
+    updateRecUI();
+    display.flash('● REC', rec.st.short, 1500);
+  }
+  async function stopRec(reason) {
+    if (!rec.on) return;
+    rec.on = false;
+    clearInterval(rec.timer);
+    await new Promise(r => { rec.onFlushed = r; recNode.port.postMessage({ type: 'off' }); setTimeout(r, 500); });
+    updateRecUI();
+    const blob = await workerJob({ type: 'end' });
+    if (rec.frames < engine.ctx.sampleRate * 3) { display.flash('GRABACIÓN', 'DEMASIADO CORTA', 2000); return; }
+    const np = rec.np, d = new Date();
+    const name = safeName(np ? `${np.artist} - ${np.title}` : `${rec.st.name} ${d.toLocaleDateString('es-ES').replace(/\//g, '-')} ${d.getHours()}h${String(d.getMinutes()).padStart(2, '0')}`) + '.mp3';
+    try { await storeOutput(name, blob); display.flash('GUARDADO', name.slice(0, 20).toUpperCase(), 2500); }
+    catch (e) { console.error(e); display.flash('ERROR', 'AL GUARDAR', 2500); }
+  }
+  function updateRecUI() {
+    const b = $('#tRec');
+    if (!b) return;
+    b.hidden = !radio.on;
+    b.classList.toggle('on', rec.on);
+    const s = rec.on ? Math.floor((Date.now() - rec.t0) / 1000) : 0;
+    b.querySelector('span').textContent = rec.on ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'REC';
+    display.state.rec = rec.on;
+  }
+
   function bindRadio() {
+    $('#tRec').onclick = () => rec.on ? stopRec('user') : startRec();
+    $('#rsForm').onsubmit = e => { e.preventDefault(); searchStations($('#rsQuery').value.trim(), ''); };
+    $$('#rsTags button').forEach(b => b.onclick = () => searchStations('', b.dataset.tag));
+    $('#rsResults').onclick = e => {
+      const pl = e.target.closest('[data-play]'), ad = e.target.closest('[data-add]');
+      if (pl) { const i = addStation(rbResults[+pl.dataset.play]); if (!radio.on) { S.station = i; setSource('radio'); } else tune(i); }
+      if (ad) { addStation(rbResults[+ad.dataset.add]); display.flash('EMISORA', 'AÑADIDA'); ad.textContent = '✓'; }
+    };
     $('#radioAdd').onsubmit = e => {
       e.preventDefault();
       const name = $('#raName').value.trim(), url = $('#raUrl').value.trim();
@@ -884,7 +1322,7 @@
     on('bass', S.eqOn && S.bass > 0);
     $$('.key.num').forEach(k => {
       const n = +k.dataset.k;
-      if (radio.on) { k.classList.toggle('on', n - 1 === S.station); return; }
+      if (radio.on) { k.classList.toggle('on', presetStation(n) === station()); return; }
       k.classList.toggle('on', (n === 1 && S.repeat > 0) || (n === 2 && S.shuffle) || (n === 3 && scanMode) || (n === 4 && audio.paused && current >= 0));
     });
     $('#tPlay').textContent = audio.paused ? '▶' : '❚❚';
@@ -958,13 +1396,33 @@
     };
     $$('.key.num').forEach(k => k.onclick = () => {
       const n = +k.dataset.k;
-      if (radio.on) { if (stations()[n - 1]) tune(n - 1); return; } // presintonías
+      if (k._long) { k._long = false; return; } // venía de una pulsación larga
+      if (radio.on) { const st = presetStation(n); if (st) tune(stations().indexOf(st)); return; } // presintonías
       if (n === 1) cycleRepeat();
       else if (n === 2) toggleShuffle();
       else if (n === 3) setScan(!scanMode);
       else if (n === 4) togglePlay();
       else if (n === 5) seekBy(-10);
       else if (n === 6) seekBy(10);
+    });
+    $$('.key.num').forEach(k => {
+      let tm = 0;
+      const cancel = () => clearTimeout(tm);
+      k.addEventListener('pointerdown', () => {
+        k._long = false;
+        if (!radio.on) return;
+        tm = setTimeout(() => {
+          const n = +k.dataset.k;
+          S.presets = (S.presets && S.presets.length === 6) ? S.presets : [1, 2, 3, 4, 5, 6].map(i => (presetStation(i) || {}).id || null);
+          S.presets[n - 1] = station().id;
+          k._long = true;
+          radioKeyLabels(); updateIcons(); buildRadioPanel(); save();
+          display.flash(`P${n} MEMORIZADA`, station().short, 1800);
+          if (navigator.vibrate) navigator.vibrate(60);
+        }, 800);
+      });
+      k.addEventListener('pointerup', cancel); k.addEventListener('pointerleave', cancel); k.addEventListener('pointercancel', cancel);
+      k.addEventListener('contextmenu', e => e.preventDefault());
     });
     $$('#joy [data-j]').forEach(b => b.onclick = () => {
       const j = b.dataset.j;
@@ -1002,7 +1460,7 @@
   function bindWindow() {
     $('#tbMin').onclick = () => nd && nd.minimize();
     $('#tbMax').onclick = () => nd && nd.maximize();
-    $('#tbClose').onclick = () => { save(true); nd ? nd.close() : window.close(); };
+    $('#tbClose').onclick = () => shutDown(() => { nd ? nd.close() : window.close(); });
     // botón de apagado (Android): dos toques para salir, para no cerrar sin querer en el coche
     let powerArmed = 0;
     $('#tbPower').hidden = !Native;
@@ -1015,11 +1473,7 @@
         setTimeout(() => $('#tbPower').classList.remove('armed'), 3000);
         return;
       }
-      display.flash('BYE BYE', 'NIGHTDRIVE', 1500);
-      audio.pause();
-      save(true);
-      if (window.NDDrive) window.NDDrive.stop();
-      setTimeout(() => Native.exit().catch(() => {}), 400);
+      shutDown(() => Native.exit().catch(() => {}));
     };
     $('#tbCompact').onclick = () => setCompact(!document.body.classList.contains('compact'));
     $('#tbTop').onclick = () => { S.onTop = !S.onTop; $('#tbTop').classList.toggle('on', S.onTop); nd && nd.onTop(S.onTop); save(); };
@@ -1078,7 +1532,7 @@
   audio.addEventListener('error', () => { if (radio.on) { if (audio.src) radioError(); return; } if (audio.src) { display.flash('ERROR-23', 'FORMATO NO SOPORTADO'); setTimeout(() => next(true), 1500); } });
 
   // ---------------- bucle de render ----------------
-  let lastIllum = 0, lastUi = 0;
+  let lastIllum = 0, lastUi = 0, lastXf = 0;
   function frame(now) {
     const st = display.state;
     st.time = audio.currentTime || 0;
@@ -1095,12 +1549,16 @@
       if (nd) nd.progress(audio.paused || !st.duration ? -1 : p);
     }
     if (currentSkin().rainbow && S.illAuto && now - lastIllum > 60) { lastIllum = now; applyIllum(); }
+    if (now - lastXf > 250) { lastXf = now; checkCrossfade(); }
     requestAnimationFrame(frame);
   }
 
   // ---------------- arranque ----------------
   async function init() {
+    installCustomSkin();
     buildSkinPanel();
+    bindEditor();
+    setTimeout(bootChime, 900);
     buildPresets();
     if (S.bands !== 31) { eq.setBandCount(S.bands); }
     segOn('#segBands', S.bands);
@@ -1147,6 +1605,8 @@
       if (pending.length) addPaths(pending, true);
     }
     // el AudioContext necesita un gesto del usuario en algunos entornos
+    applyNight(true);
+    setInterval(() => applyNight(false), 60000);
     radioKeyLabels();
     if (S.source === 'radio') { radio.on = true; radioKeyLabels(); tune(S.station || 0, false); }
     const unlock = () => { engine.resume(); window.removeEventListener('pointerdown', unlock); };

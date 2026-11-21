@@ -7,10 +7,10 @@ self.onmessage = e => {
   try {
     const info = parseRom(new Uint8Array(m.rom));
     let result;
-    if (m.type === 'info') result = { crc: crc32(info.rom), title: info.title, isMD: info.isMD, region: info.region };
+    if (m.type === 'info') result = { crc: crc32(info.rom), title: info.title, isMD: info.isMD, region: info.region, serial: info.serial };
     else if (m.type === 'scan') {
       const res = scanRom(info, p => self.postMessage({ type: 'progress', id: m.id, p }));
-      result = { ...res, crc: crc32(info.rom), title: info.title };
+      result = { ...res, crc: crc32(info.rom), title: info.title, serial: info.serial };
     } else if (m.type === 'snapshot') result = snapshotAt(info, m.frame);
     self.postMessage({ type: 'done', id: m.id, result });
   } catch (err) {

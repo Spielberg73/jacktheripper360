@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('nd', {
   openFolder: () => ipcRenderer.invoke('dialog:open-folder'),
   expand: paths => ipcRenderer.invoke('fs:expand', paths),
   readFile: p => ipcRenderer.invoke('fs:read', p),
+  saveFile: (name, bytes) => ipcRenderer.invoke('file:save', name, bytes),
   exists: p => ipcRenderer.invoke('fs:exists', p),
   tags: paths => ipcRenderer.invoke('meta:tags', paths),
   tagsBuffer: (bytes, name) => ipcRenderer.invoke('meta:buffer', bytes, name),

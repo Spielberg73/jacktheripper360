@@ -277,6 +277,227 @@
       if (Math.floor(t * 4 + ph) % 2) for (let i = -8; i <= 8; i += 3) b.fillRect(x0 + i, y + 6, 1, 1);
     }
 
+    // ---------------- lluvia en el parabrisas ----------------
+    rain(b, t, dt, au) {
+      if (!this.drops) {
+        this.drops = [];
+        const r = rng(77);
+        this.bokeh = Array.from({ length: 12 }, () => ({ x: r() * W, y: 6 + r() * 34, r: 2 + r() * 4, ph: r() * 6, on: r() < 0.3 }));
+      }
+      // luces de la ciudad desenfocadas al otro lado del cristal
+      for (const k of this.bokeh) {
+        const pulse = k.on ? Math.sin(t * 1.5 + k.ph) > -0.3 : true;
+        if (!pulse) continue;
+        for (let a = 0; a < 6.28; a += 0.5) { b.fillStyle = DIM; b.fillRect(Math.round(k.x + Math.cos(a) * k.r), Math.round(k.y + Math.sin(a) * k.r * 0.8), 1, 1); }
+        if (k.on) { b.fillStyle = ON; b.fillRect(Math.round(k.x), Math.round(k.y), 1, 1); }
+      }
+      // semáforo a lo lejos
+      b.fillStyle = DIM; b.fillRect(200, 12, 1, 20); b.fillStyle = ON; b.fillRect(199, 10 + (Math.floor(t / 4) % 3) * 2, 3, 2);
+      // gotas nuevas (más con la música)
+      const n = Math.random() < 0.6 + au.high ? 2 + Math.floor(au.energy * 4) : 0;
+      for (let i = 0; i < n && this.drops.length < 260; i++) this.drops.push({ x: Math.random() * W, y: Math.random() * 54, slide: Math.random() < 0.08 ? 8 + Math.random() * 16 : 0, big: Math.random() < 0.25 });
+      // limpiaparabrisas: barrido cada 3,2 s
+      const cyc = (t % 3.2) / 3.2;
+      const ease = x => 0.5 - Math.cos(Math.PI * x) / 2;
+      const ang = cyc < 0.35 ? ease(cyc / 0.35) : cyc < 0.7 ? ease(1 - (cyc - 0.35) / 0.35) : 0;
+      const prev = this.wiperAng === undefined ? 0 : this.wiperAng;
+      this.wiperAng = ang;
+      const wipers = [[72, 70], [176, 70]];
+      const lo = Math.min(prev, ang), hi = Math.max(prev, ang);
+      this.drops = this.drops.filter(d => {
+        for (const [px, len] of wipers) {
+          const dx = d.x - px, dy = 66 - d.y, dist = Math.hypot(dx, dy);
+          if (dist > len) continue;
+          const a = Math.atan2(dy, -dx) / Math.PI; // 0 = izquierda, 1 = derecha
+          if (a >= lo - 0.03 && a <= hi + 0.03 && hi - lo > 0.001) return false;
+        }
+        return true;
+      });
+      for (const d of this.drops) {
+        if (d.slide > 0) { d.y += dt * d.slide; if (d.y > 56) d.slide = 0; b.fillStyle = DIM; b.fillRect(Math.round(d.x), Math.round(d.y) - 3, 1, 3); }
+        b.fillStyle = ON; b.fillRect(Math.round(d.x), Math.round(d.y), d.big ? 2 : 1, 1);
+        if (d.big) { b.fillStyle = DIM; b.fillRect(Math.round(d.x), Math.round(d.y) + 1, 2, 1); }
+      }
+      // escobillas
+      for (const [px, len] of wipers) {
+        const a = Math.PI * ang;
+        const ex = px - Math.cos(a) * len, ey = 66 - Math.sin(a) * len;
+        for (let i = 0; i <= len; i += 1) {
+          const x = Math.round(px + (ex - px) * i / len), y = Math.round(66 + (ey - 66) * i / len);
+          b.fillStyle = ON; b.fillRect(x, y, 2, 1);
+          if (i > len * 0.3) { b.fillRect(x, y - 1, 1, 1); b.fillStyle = DIM; b.fillRect(x + 1, y - 1, 1, 1); }
+        }
+      }
+      // salpicadero
+      b.clearRect(0, 58, W, 6);
+      b.fillStyle = ON;
+      for (let x = 0; x < W; x++) b.fillRect(x, 58 + Math.round(Math.abs(x - 128) / 64), 1, 1);
+    }
+
+    // ---------------- túnel con luces naranjas ----------------
+    tunnelLights(b, t, dt, au) {
+      const vx = 128, vy = 30;
+      this.tunZ = (this.tunZ || 0) + dt * (0.5 + au.energy * 1.4);
+      // anillos del túnel acercándose
+      for (let k = 0; k < 7; k++) {
+        const z = frac(k / 7 + this.tunZ * 0.5), p = z * z;
+        const w = 10 + p * 150, h = 6 + p * 40;
+        b.fillStyle = p > 0.35 ? ON : DIM;
+        for (let x = -w; x <= w; x += p > 0.35 ? 1 : 2) { const yy = vy - h * Math.sqrt(Math.max(0, 1 - (x / w) ** 2)); b.fillRect(Math.round(vx + x), Math.round(yy), 1, 1); }
+      }
+      // paredes y suelo
+      for (let i = 0; i < 60; i++) {
+        const p = i / 60;
+        b.fillStyle = ON; b.fillRect(Math.round(vx - 10 - p * 150), Math.round(vy + p * 40), 1, 1); b.fillRect(Math.round(vx + 10 + p * 150), Math.round(vy + p * 40), 1, 1);
+        if (i % 2) { b.fillStyle = DIM; b.fillRect(Math.round(vx - 10 - p * 150), Math.round(vy + p * 40) - 2, 1, 1); b.fillRect(Math.round(vx + 10 + p * 150), Math.round(vy + p * 40) - 2, 1, 1); }
+      }
+      // luces en las paredes, a ras de suelo
+      for (let k = 0; k < 8; k++) {
+        const z = frac(k / 8 + this.tunZ * 0.9), p = z * z;
+        for (const side of [-1, 1]) { b.fillStyle = ON; b.fillRect(Math.round(vx + side * (10 + p * 150)) - (side > 0 ? 2 : 0), Math.round(vy + p * 40) - 4 - Math.round(p * 4), Math.max(1, Math.round(1 + p * 3)), 1); }
+      }
+      // dos filas de luces en el techo
+      for (let k = 0; k < 10; k++) {
+        const z = frac(k / 10 + this.tunZ), p = z * z;
+        for (const side of [-1, 1]) {
+          const x = vx + side * (4 + p * 70), y = vy - 4 - p * 36;
+          const len = Math.max(2, Math.round(2 + p * 14)), th = p > 0.4 ? 2 : 1;
+          b.fillStyle = ON; b.fillRect(Math.round(x - len / 2), Math.round(y), len, th);
+          if (p > 0.2) { b.fillStyle = DIM; b.fillRect(Math.round(x - len / 2) - 1, Math.round(y) + th, len + 2, 1); }
+        }
+      }
+      // líneas del carril
+      for (let k = 0; k < 8; k++) {
+        const z0 = frac(k / 8 + this.tunZ * 1.2), p0 = z0 * z0, p1 = Math.min(1, (z0 + 0.05) ** 2);
+        const y0 = Math.round(vy + 2 + 32 * p0), y1 = Math.round(vy + 2 + 32 * p1);
+        b.fillStyle = ON; b.fillRect(vx, y0, Math.max(1, Math.round(1 + p0 * 3)), Math.max(1, y1 - y0));
+      }
+      // salida del túnel al fondo (más brillante con el bajo)
+      b.fillStyle = au.bass > 0.6 ? ON : DIM; b.fillRect(vx - 4, vy - 3, 9, 5);
+    }
+
+    // ---------------- ciudad de neón ----------------
+    neonCity(b, t, dt, au) {
+      if (!this.neon) {
+        const r = rng(4242);
+        const mk = (n, hMin, hMax) => { const a = []; let x = 0; while (x < W * 2) { const w = 10 + Math.floor(r() * 18), h = hMin + Math.floor(r() * (hMax - hMin)); a.push({ x, w, h, sign: r() < 0.35 ? ['BAR', 'HOTEL', '24H', 'NIGHT', 'CLUB', 'RADIO'][Math.floor(r() * 6)] : null, ph: r() * 6, wins: Array.from({ length: 12 }, () => [Math.floor(r() * (w - 2)) + 1, Math.floor(r() * (h - 3)) + 2]) }); x += w + 2 + Math.floor(r() * 4); } return a; };
+        this.neon = { far: mk(0, 14, 34), near: mk(0, 10, 26), carsZ: 0 };
+      }
+      const N = this.neon;
+      N.off = (N.off || 0) + dt * 6;
+      // edificios lejanos (tenues) y cercanos (contorno brillante)
+      const layer = (list, speed, bright, base) => {
+        const span = list[list.length - 1].x + list[list.length - 1].w;
+        for (const bl of list) {
+          let x = Math.round(bl.x - (N.off * speed) % span);
+          if (x + bl.w < 0) x += span;
+          if (x >= W) continue;
+          const top = base - bl.h;
+          b.clearRect(x, top, bl.w, bl.h);
+          b.fillStyle = bright ? ON : DIM;
+          b.fillRect(x, top, bl.w, 1); b.fillRect(x, top, 1, bl.h); b.fillRect(x + bl.w - 1, top, 1, bl.h);
+          b.fillStyle = DIM;
+          for (const [wx, wy] of bl.wins) if (Math.sin(t * 0.3 + wx * wy + bl.ph) > -0.2) b.fillRect(x + wx, top + wy, 1, 1);
+          if (bright && bl.sign) {
+            const blink = Math.sin(t * 3 + bl.ph) > -0.6 || au.kick;
+            if (blink) {
+              b.fillStyle = ON; b.font = 'bold 8px Consolas, monospace'; b.textBaseline = 'top'; b.textAlign = 'center';
+              b.fillText(bl.sign, x + bl.w / 2, top + 2);
+            }
+          }
+        }
+      };
+      this.sky(b, t, au, 20, 40);
+      layer(N.far, 0.4, false, 52);
+      layer(N.near, 1, true, 54);
+      // pantalla gigante con el espectro de la música
+      const sx = 104, sy = 8, sw = 48, sh = 22;
+      b.clearRect(sx - 1, sy - 1, sw + 2, sh + 2);
+      b.fillStyle = ON; b.fillRect(sx - 1, sy - 1, sw + 2, 1); b.fillRect(sx - 1, sy + sh, sw + 2, 1); b.fillRect(sx - 1, sy, 1, sh); b.fillRect(sx + sw, sy, 1, sh);
+      b.fillRect(sx + sw / 2 - 1, sy + sh + 1, 2, 54 - sy - sh - 1);
+      for (let i = 0; i < 12; i++) {
+        const v = au.spec ? au.spec[i] : 0, h = Math.round(v * (sh - 2));
+        b.fillStyle = ON; b.fillRect(sx + 1 + i * 4, sy + sh - 1 - h, 3, h);
+      }
+      // calle con faros que pasan
+      b.clearRect(0, 55, W, 9);
+      b.fillStyle = DIM; for (let x = 0; x < W; x += 2) b.fillRect(x, 55, 1, 1);
+      N.carsZ += dt * (40 + au.energy * 80);
+      for (let k = 0; k < 4; k++) {
+        const x = Math.round((N.carsZ * (k % 2 ? 1 : -1.3) + k * 70) % (W + 40));
+        const xx = x < -20 ? x + W + 40 : x;
+        b.fillStyle = ON; b.fillRect(xx, 58 + (k % 2) * 3, 8, 1);
+        b.fillStyle = DIM; b.fillRect(xx - (k % 2 ? 6 : -8), 58 + (k % 2) * 3, 6, 1);
+      }
+    }
+
+    // ---------------- atardecer en la playa ----------------
+    sunset(b, t, dt, au) {
+      const hz = 34, cx = 128;
+      // sol "retro" con franjas, medio hundido en el mar
+      const R = 18;
+      for (let y = -R; y <= 0; y++) {
+        const band = (y + R) % 5;
+        if (y > -R * 0.55 && band === 0) continue; // franjas
+        const half = Math.round(Math.sqrt(R * R - y * y));
+        b.fillStyle = ON; b.fillRect(cx - half, hz + y, half * 2 + 1, 1);
+      }
+      // estrellas que empiezan a salir
+      this.sky(b, t, au, 16, 30);
+      // pájaros
+      for (let i = 0; i < 3; i++) {
+        const x = Math.round((t * (6 + i * 2) + i * 90) % (W + 20)) - 10, y = Math.round(8 + i * 4 + Math.sin(t * 1.2 + i) * 2);
+        const up = Math.sin(t * 6 + i * 2) > 0;
+        b.fillStyle = ON; b.fillRect(x, y, 1, 1); b.fillRect(x - 1, y - (up ? 1 : 0), 1, 1); b.fillRect(x + 1, y - (up ? 1 : 0), 1, 1);
+      }
+      // horizonte y reflejo del sol en el agua
+      b.fillStyle = ON; b.fillRect(0, hz, W, 1);
+      b.clearRect(0, hz + 1, W, H - hz - 1);
+      for (let y = hz + 2; y < 52; y += 2) {
+        const w = Math.round((R - (y - hz) * 0.6) * (0.8 + 0.4 * Math.sin(t * 2 + y))), sh = Math.round(Math.sin(t * 1.5 + y * 0.7) * 2);
+        if (w > 0) { b.fillStyle = (y % 4) ? DIM : ON; b.fillRect(cx - w + sh, y, w * 2, 1); }
+        for (let x = (y * 7) % 11; x < W; x += 11 + (y % 3)) { b.fillStyle = DIM; if (Math.abs(x - cx) > R + 2) b.fillRect(x + Math.round(Math.sin(t + y) * 2), y, 3, 1); }
+      }
+      // olas que llegan a la orilla (más grandes con el bajo)
+      const shore = 55 + Math.round(Math.sin(t * 0.8) * 2 - au.bass * 2);
+      for (let x = 0; x < W; x++) {
+        const y = shore + Math.round(Math.sin(x * 0.12 + t * 1.6) * 1.2);
+        b.fillStyle = ON; b.fillRect(x, y, 1, 1);
+        if ((x + Math.floor(t * 8)) % 3 === 0) { b.fillStyle = DIM; b.fillRect(x, y + 1, 1, 1); }
+      }
+      // arena
+      b.fillStyle = DIM; for (let y = shore + 3; y < H; y += 2) for (let x = (y % 4); x < W; x += 4) b.fillRect(x, y, 1, 1);
+      // palmeras que se mecen
+      this.palm(b, 26, 63, 34, t, 0);
+      this.palm(b, 222, 63, 28, t, 1.7);
+      this.palm(b, 244, 63, 22, t, 0.9);
+    }
+
+    palm(b, x0, y0, h, t, ph) {
+      const sway = Math.sin(t * 0.9 + ph) * 3;
+      let tx = x0, ty = y0;
+      b.fillStyle = ON;
+      for (let i = 0; i <= h; i++) {
+        const k = i / h;
+        tx = x0 + sway * k * k + k * 6 * (x0 < 128 ? 1 : -1);
+        ty = y0 - i;
+        b.fillRect(Math.round(tx), ty, 2, 1);
+        if (i % 3 === 0) { b.fillStyle = DIM; b.fillRect(Math.round(tx) - 1, ty, 1, 1); b.fillStyle = ON; }
+      }
+      // hojas
+      for (let f = 0; f < 6; f++) {
+        const a = -Math.PI / 2 + (f - 2.5) * 0.55 + Math.sin(t * 1.3 + ph + f) * 0.08;
+        const len = 10 + (f % 2) * 4;
+        for (let i = 1; i <= len; i++) {
+          const k = i / len;
+          const x = tx + Math.cos(a) * i * 1.3, y = ty + Math.sin(a) * i * 0.6 + k * k * 7;
+          b.fillStyle = i > len * 0.7 ? DIM : ON;
+          b.fillRect(Math.round(x), Math.round(y), 1, 1);
+        }
+      }
+      b.fillStyle = ON; b.fillRect(Math.round(tx) - 1, ty + 1, 2, 2); b.fillRect(Math.round(tx) + 2, ty + 2, 2, 2); // cocos
+    }
+
     draw(name, b, au) {
       const now = performance.now();
       const dt = Math.min(0.1, (now - this.last) / 1000);
@@ -285,6 +506,10 @@
       if (name === 'NIGHT SKY') this.nightSky(b, t, dt, au);
       else if (name === 'HIGHWAY') this.highway(b, t, dt, au);
       else if (name === 'HARBOR') this.harbor(b, t, dt, au);
+      else if (name === 'RAIN') this.rain(b, t, dt, au);
+      else if (name === 'TUNNEL LIGHTS') this.tunnelLights(b, t, dt, au);
+      else if (name === 'NEON CITY') this.neonCity(b, t, dt, au);
+      else if (name === 'SUNSET') this.sunset(b, t, dt, au);
     }
   }
 

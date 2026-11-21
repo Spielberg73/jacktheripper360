@@ -22,6 +22,19 @@ Reproductor de música para Windows con aspecto de **autorradio 1‑DIN de los 2
 - Preamp, Bass Boost, Loudness (Off/Low/Mid/High), balance y modo bypass.
 - Limitador al final de la cadena para que los presets extremos no saturen.
 
+**Novedades de esta versión**
+- **Crossfade**: las canciones se funden entre sí (0–12 s, ajustable en FRONTALES). No se aplica a VGM, ROM ni radio.
+- **Modo noche automático**: atenúa el frontal y la pantalla entre la puesta y la salida del sol, calculadas con la ubicación del GPS o, si no la hay, con la de España. Opciones AUTO / SIEMPRE / NUNCA.
+- **Listas guardadas**: guarda la playlist con un nombre, cárgala o bórrala. Ordena por título, artista o álbum.
+- **Buscador de radios**: miles de emisoras de todo el mundo (directorio abierto Radio Browser), por nombre, país o estilo.
+- **Grabar la radio**: botón **REC**. Graba lo que suena en MP3 a 192 kbps y para sola al cambiar de canción. El archivo se llama "Artista - Canción.mp3" y se guarda en Música\NightDrive (PC) o en la biblioteca y Descargas/NightDrive (móvil).
+- **Presintonías**: mantén pulsada una tecla 1–6 para guardar ahí la emisora que suena.
+- **Exportar** canciones de VGM y de ROMs a MP3 o WAV (botón EXPORTAR en la playlist).
+- **Títulos de canciones**: Sonic 2 trae sus títulos reales. Cualquier pista se puede renombrar tocando su título en "Ahora suena", y el nombre se recuerda para esa ROM.
+- **Escenas nuevas**: lluvia con limpiaparabrisas, túnel con luces naranjas, ciudad de neón (con el espectro en una pantalla gigante) y atardecer en la playa.
+- **Pitido de autorradio** al arrancar y al apagar. Al cerrar, el frontal se suelta y cae.
+- **Editor de frontal**: colores de la placa, acabado (brillo, aluminio cepillado o carbono), teclas, pantalla y logo, con vista previa en directo.
+
 **Radio por internet**
 - Se enciende con el botón **RADIO** de la barra de reproducción (junto al play), o con **SRC** en el frontal, como en el coche. Ese mismo botón pasa a llamarse **DISC** para volver a tu música.
 - Presintonías en las teclas **1–6**: LOS40 Classic, LOS40, LOS40 Dance, LOS40 Urban, Cadena Dial y Radiolé. En la lista hay también Cadena SER. **◀◀ / ▶▶** pasan a la emisora anterior o siguiente.
@@ -128,6 +141,9 @@ MusicPlayer/
     ├── md/           m68k.js, z80.js, megadrive.js, scan.js y md-player.js (ROMs)
     ├── rom.js / rom-worker.js   análisis de ROMs en segundo plano
     ├── zip.js        lector de ZIP
+    ├── drive.js      GPS y giroscopio (modo coche)
+    ├── mp3-worker.js / rec-worklet.js   grabación de radio y exportación a MP3/WAV
+    └── vendor/       lamejs (codificador MP3, LGPL-3.0)
     ├── display.js    pantalla de matriz de puntos y sus animaciones
     ├── eq.js         ecualizador gráfico y analizador
     └── app.js        playlist, reproducción, frontales y controles

@@ -40,6 +40,7 @@
       if (dt > 0.5) v = haversine(last.c, p.coords) / dt;
     }
     last = { c: p.coords, t: p.timestamp };
+    try { localStorage.setItem('nd-pos', JSON.stringify([p.coords.latitude, p.coords.longitude])); } catch { }
     if (v === null || v === undefined || isNaN(v)) return;
     const kmh = Math.max(0, v * 3.6);
     D.speed = D.speed === null ? kmh : D.speed + (kmh - D.speed) * 0.5;

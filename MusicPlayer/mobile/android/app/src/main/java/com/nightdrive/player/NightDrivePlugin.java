@@ -2,7 +2,15 @@ package com.nightdrive.player;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.ContentValues;
+import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Base64;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.WindowManager;
@@ -69,6 +77,39 @@ public class NightDrivePlugin extends Plugin {
     public void stop(PluginCall call) {
         getContext().stopService(new Intent(getContext(), PlaybackService.class));
         call.resolve();
+    }
+
+    // Guarda un archivo (grabación de radio o exportación) en Descargas/NightDrive
+    @PluginMethod
+    public void saveToDownloads(PluginCall call) {
+        String name = call.getString("name", "nightdrive.mp3");
+        String mime = call.getString("mime", "audio/mpeg");
+        String data = call.getString("data", "");
+        try {
+            byte[] bytes = Base64.decode(data, Base64.DEFAULT);
+            String where;
+            if (Build.VERSION.SDK_INT >= 29) {
+                ContentValues v = new ContentValues();
+                v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+                v.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+                v.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/NightDrive");
+                Uri uri = getContext().getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                if (uri == null) throw new Exception("MediaStore");
+                try (OutputStream os = getContext().getContentResolver().openOutputStream(uri)) { os.write(bytes); }
+                where = "Descargas/NightDrive/" + name;
+            } else {
+                File dir = new File(getContext().getExternalFilesDir(Environment.DIRECTORY_MUSIC), "NightDrive");
+                dir.mkdirs();
+                File f = new File(dir, name);
+                try (FileOutputStream os = new FileOutputStream(f)) { os.write(bytes); }
+                where = f.getAbsolutePath();
+            }
+            JSObject r = new JSObject();
+            r.put("path", where);
+            call.resolve(r);
+        } catch (Exception e) {
+            call.reject("No se pudo guardar: " + e.getMessage());
+        }
     }
 
     // Botón de apagado: para la música, el servicio y cierra la app del todo
