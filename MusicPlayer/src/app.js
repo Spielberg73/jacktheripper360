@@ -847,9 +847,9 @@
     knob.addEventListener('wheel', e => { e.preventDefault(); setVolume(S.volume + (e.deltaY < 0 ? 1 : -1)); }, { passive: false });
     let drag = null;
     knob.addEventListener('pointerdown', e => {
-      knob.setPointerCapture(e.pointerId);
+      try { knob.setPointerCapture(e.pointerId); } catch { /* puntero ya liberado */ }
       const r = knob.getBoundingClientRect();
-      drag = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, y: e.clientY, v: S.volume, moved: false, ang: null };
+      drag = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, y: e.clientY, v: S.volume, moved: false, ang: null, t0: performance.now() };
     });
     knob.addEventListener('pointermove', e => {
       if (!drag) return;
@@ -864,7 +864,9 @@
       }
       drag.ang = a;
     });
-    knob.addEventListener('pointerup', () => { if (drag && !drag.moved) togglePlay(); drag = null; });
+    // un toque corto y quieto en la rueda = play/pausa (como el "PUSH" de las autorradios)
+    knob.addEventListener('pointerup', () => { if (drag && !drag.moved && performance.now() - drag.t0 < 350) togglePlay(); drag = null; });
+    knob.addEventListener('pointercancel', () => { drag = null; });
   }
 
   // ---------------- indicadores ----------------
@@ -964,7 +966,7 @@
       let t = 0, ff = 0;
       b.addEventListener('pointerdown', () => { t = setTimeout(() => { ff = setInterval(() => seekBy(b.classList.contains('right') ? 4 : -4), 120); b._ff = true; }, 450); });
       const end = () => { clearTimeout(t); if (ff) { clearInterval(ff); ff = 0; setTimeout(() => b._ff = false, 0); } };
-      b.addEventListener('pointerup', end); b.addEventListener('pointerleave', end);
+      b.addEventListener('pointerup', end); b.addEventListener('pointerleave', end); b.addEventListener('pointercancel', end);
       b.addEventListener('click', e => { if (b._ff) { e.stopImmediatePropagation(); b._ff = false; } }, true);
     });
   }
@@ -980,6 +982,7 @@
     seek.addEventListener('pointerdown', e => { if (!audio.duration) return; dragging = true; seek.setPointerCapture(e.pointerId); audio.currentTime = at(e) * audio.duration; });
     seek.addEventListener('pointermove', e => { if (dragging) audio.currentTime = at(e) * audio.duration; });
     seek.addEventListener('pointerup', () => dragging = false);
+    seek.addEventListener('pointercancel', () => dragging = false);
     $$('#tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
   }
 

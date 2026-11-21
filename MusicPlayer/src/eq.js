@@ -74,9 +74,10 @@
           track.setPointerCapture(e.pointerId);
           setFromY(e.clientY);
           const move = ev => setFromY(ev.clientY);
-          const up = () => { track.removeEventListener('pointermove', move); track.removeEventListener('pointerup', up); };
+          const up = () => { track.removeEventListener('pointermove', move); track.removeEventListener('pointerup', up); track.removeEventListener('pointercancel', up); };
           track.addEventListener('pointermove', move);
           track.addEventListener('pointerup', up);
+          track.addEventListener('pointercancel', up);
         });
         track.addEventListener('wheel', e => { e.preventDefault(); this.setGain(i, this.gains[i] + (e.deltaY < 0 ? 0.5 : -0.5), true); }, { passive: false });
         track.addEventListener('dblclick', () => this.setGain(i, 0, true));
@@ -156,6 +157,7 @@
       c.addEventListener('pointermove', e => { this.hover = e; if (this.painting) apply(e); });
       c.addEventListener('pointerleave', () => { this.hover = null; });
       c.addEventListener('pointerup', () => { this.painting = false; last = null; });
+      c.addEventListener('pointercancel', () => { this.painting = false; last = null; });
     }
 
     _nearest(x) {
