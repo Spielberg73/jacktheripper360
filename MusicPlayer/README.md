@@ -92,7 +92,10 @@ Además, cada push que toca `MusicPlayer/` lanza el workflow **NightDrive Player
 La carpeta `mobile/` empaqueta la misma app con Capacitor (Android 6.0 o superior):
 
 - La interfaz se adapta al móvil. En vertical, el frontal queda arriba y debajo van el ecualizador (los deslizadores se arrastran en horizontal) y la playlist. En horizontal parece un frontal de verdad.
-- **Modo coche** (botón de arriba): pantalla completa solo con el frontal y la pantalla siempre encendida.
+- **Modo coche** (botón de arriba): pantalla completa solo con el frontal, la pantalla siempre encendida y la escena **HIGHWAY**:
+  - el velocímetro marca la **velocidad real del GPS** y la carretera avanza a ese ritmo (parado en un semáforo, la carretera se para y se encienden las luces de freno del coche de delante);
+  - la carretera **se curva cuando el coche gira**, gracias al giroscopio del móvil. La ciudad y la luna se desplazan en el horizonte. Funciona coloques como coloques el móvil en el soporte.
+- **Botón de apagado** (arriba a la derecha): dos toques para salir del todo de la app, con la música y la notificación incluidas.
 - **Biblioteca**: los archivos que importas (MP3, ZIP, VGZ, ROMs…) se guardan dentro de la app, así que siguen ahí al volver a abrirla.
 - **Segundo plano**: un servicio de Android mantiene la música con la pantalla apagada. La notificación tiene anterior/pausa/siguiente, y responde a los botones multimedia de los auriculares y del Bluetooth del coche.
 - Un toque en una canción la reproduce. Una pulsación larga la selecciona, para poder QUITARLA.

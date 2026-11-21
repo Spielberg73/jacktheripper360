@@ -3,6 +3,8 @@ package com.nightdrive.player;
 import android.Manifest;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.WindowManager;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSObject;
@@ -67,6 +69,17 @@ public class NightDrivePlugin extends Plugin {
     public void stop(PluginCall call) {
         getContext().stopService(new Intent(getContext(), PlaybackService.class));
         call.resolve();
+    }
+
+    // Botón de apagado: para la música, el servicio y cierra la app del todo
+    @PluginMethod
+    public void exit(PluginCall call) {
+        call.resolve();
+        getContext().stopService(new Intent(getContext(), PlaybackService.class));
+        getActivity().runOnUiThread(() -> {
+            getActivity().finishAndRemoveTask();
+            new Handler(Looper.getMainLooper()).postDelayed(() -> android.os.Process.killProcess(android.os.Process.myPid()), 400);
+        });
     }
 
     @PluginMethod

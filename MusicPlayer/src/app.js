@@ -65,9 +65,9 @@
   let S;
   try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('nightdrive') || '{}')); } catch { S = { ...DEFAULTS }; }
   let saveTimer = 0;
-  function save() {
+  function save(now) {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
+    const write = () => {
       try {
         const keep = t => !t.scanning && (nd ? t.path : t.lib);
         const out = { ...S, playlist: (nd || lib) ? tracks.filter(keep).map(t => ({ path: t.path, lib: t.lib, entry: t.entry, zip: t.zip, tagged: t.tagged, rom: t.rom, title: t.title, artist: t.artist, album: t.album, duration: t.duration, name: t.name, codec: t.codec, bitrate: t.bitrate, sampleRate: t.sampleRate, system: t.system })) : [] };
@@ -75,7 +75,8 @@
         out.current = current;
         localStorage.setItem('nightdrive', JSON.stringify(out));
       } catch { /* almacenamiento no disponible */ }
-    }, 300);
+    };
+    if (now) write(); else saveTimer = setTimeout(write, 300);
   }
 
   // ---------------- motor ----------------
@@ -712,7 +713,7 @@
     const img = $('#rdCover');
     if (np && np.cover) { img.src = np.cover; img.classList.add('show'); } else img.classList.remove('show');
     const title = np ? `${np.artist} — ${np.title}` : st.name;
-    $('#tbTitle').textContent = `${st.name} · ${title}`;
+    $('#tbTitle').textContent = np ? `${st.name} · ${title}` : st.name;
     document.title = `${st.name} · NightDrive`;
     if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: np ? np.title : st.name, artist: np ? np.artist : st.name, album: st.name, artwork: np && np.cover ? [{ src: np.cover }] : [] });
     if (Native) Native.update({ title: np ? np.title : st.name, artist: (np ? np.artist + ' · ' : '') + st.name, playing: !audio.paused }).catch(() => {});
@@ -905,8 +906,20 @@
     if (document.body.classList.contains('compact')) setCompact(false);
     save();
   }
+  let carPrevMode = null;
   function setCompact(v) {
     if (Native) { Native.keepAwake({ on: v || !!S.keepAwake }).catch(() => {}); if (v && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); else if (!v && document.fullscreenElement) document.exitFullscreen().catch(() => {}); }
+    // modo coche en el móvil: GPS + giroscopio y la escena de la carretera
+    const drive = window.NDDrive;
+    if (v && (Native || isTouch) && drive && !drive.active) {
+      drive.start();
+      carPrevMode = display.mode;
+      setMode(window.NDDisplay.MODES.indexOf('HIGHWAY'));
+    } else if (!v && drive && drive.active) {
+      drive.stop();
+      if (carPrevMode !== null) setMode(carPrevMode);
+      carPrevMode = null;
+    }
     document.body.classList.toggle('compact', v);
     $('#tbCompact').classList.toggle('on', v);
     if (nd) nd.compact(v);
@@ -989,7 +1002,25 @@
   function bindWindow() {
     $('#tbMin').onclick = () => nd && nd.minimize();
     $('#tbMax').onclick = () => nd && nd.maximize();
-    $('#tbClose').onclick = () => { save(); nd ? nd.close() : window.close(); };
+    $('#tbClose').onclick = () => { save(true); nd ? nd.close() : window.close(); };
+    // botón de apagado (Android): dos toques para salir, para no cerrar sin querer en el coche
+    let powerArmed = 0;
+    $('#tbPower').hidden = !Native;
+    $('#tbPower').onclick = () => {
+      if (!Native) return;
+      if (Date.now() - powerArmed > 3000) {
+        powerArmed = Date.now();
+        $('#tbPower').classList.add('armed');
+        display.flash('¿APAGAR?', 'PULSA OTRA VEZ', 3000);
+        setTimeout(() => $('#tbPower').classList.remove('armed'), 3000);
+        return;
+      }
+      display.flash('BYE BYE', 'NIGHTDRIVE', 1500);
+      audio.pause();
+      save(true);
+      if (window.NDDrive) window.NDDrive.stop();
+      setTimeout(() => Native.exit().catch(() => {}), 400);
+    };
     $('#tbCompact').onclick = () => setCompact(!document.body.classList.contains('compact'));
     $('#tbTop').onclick = () => { S.onTop = !S.onTop; $('#tbTop').classList.toggle('on', S.onTop); nd && nd.onTop(S.onTop); save(); };
     if (!nd) $$('#tbMin, #tbMax, #tbClose').forEach(b => b.style.display = 'none');

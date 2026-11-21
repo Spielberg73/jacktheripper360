@@ -459,3 +459,11 @@ body.playing .np-radio i { animation-play-state: running; }
 /* zona táctil más grande para SRC */
 .k-src::after { content: ''; position: absolute; inset: -1.4cqw; border-radius: 50%; }
 @media (max-width: 760px) { .src-toggle { height: 32px; padding: 0 10px; letter-spacing: .1em; font-size: 11px; } }
+
+/* botón de apagado (Android) */
+.tb-btns .power { position: relative; }
+.tb-btns .power i { position: absolute; left: 50%; top: 50%; width: 15px; height: 15px; margin: -7px 0 0 -7.5px; border: 2px solid currentColor; border-radius: 50%; border-top-color: transparent; }
+.tb-btns .power i::before { content: ''; position: absolute; left: 50%; top: -6px; width: 2px; height: 9px; margin-left: -1px; background: currentColor; border-radius: 1px; }
+.tb-btns .power { color: var(--illum); }
+.tb-btns .power.armed { background: #c4161c; color: #fff; animation: armed .5s ease-in-out infinite alternate; }
+@keyframes armed { to { background: #6a0a0e; } }

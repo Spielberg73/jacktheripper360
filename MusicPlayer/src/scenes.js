@@ -33,11 +33,12 @@
     }
 
     // ------------------------------------------------------------
-    sky(b, t, au, onlyAbove = 64, count = 120) {
+    sky(b, t, au, onlyAbove = 64, count = 120, off = 0) {
       const hi = au.high;
       for (let i = 0; i < count; i++) {
-        const s = this.stars[i];
-        if (s.y >= onlyAbove) continue;
+        const s0 = this.stars[i];
+        if (s0.y >= onlyAbove) continue;
+        const s = off ? { ...s0, x: Math.round((((s0.x + off) % W) + W) % W) } : s0;
         const tw = Math.sin(t * s.sp + s.ph) + hi * 1.6;
         if (tw > 0.55) {
           b.fillStyle = ON; b.fillRect(s.x, s.y, 1, 1);
@@ -95,22 +96,35 @@
     // ---------------- carretera de noche ----------------
     highway(b, t, dt, au) {
       const hy = 26, vx = 128;
-      this.roadZ += dt * (0.35 + au.energy * 1.6);
-      this.sky(b, t, au, hy - 12, 60);
-      this.moon(b, 34, 8, 5, false);
-      // ciudad en el horizonte
+      const drive = window.NDDrive;
+      const realSpeed = !!(drive && drive.gpsOk);
+      const kmh = realSpeed ? drive.speed : 80 + au.energy * 90 + Math.sin(t) * 3;
+      // avance: con GPS a la velocidad real (parado en un semáforo, la carretera se para)
+      this.roadZ += dt * (realSpeed ? kmh / 3.6 / 45 : 0.35 + au.energy * 1.6);
+      // curvas: giroscopio del móvil (grados/s) o curvas suaves de demostración
+      const target = drive && drive.sensorOk ? drive.yaw : 7 * Math.sin(t * 0.09) + 4 * Math.sin(t * 0.037 + 1);
+      this.curve = (this.curve || 0) + (target - (this.curve || 0)) * Math.min(1, dt * 3);
+      this.skyOff = (this.skyOff || 0) + this.curve * dt * 2.84; // ~90° de campo de visión en 256 puntos
+      const off = ((this.skyOff % W) + W) % W;
+      const shift = p => Math.max(-110, Math.min(110, -this.curve * (1 - p) * (1 - p) * 2.6));
+      this.sky(b, t, au, hy - 12, 60, off);
+      this.moon(b, Math.round((((34 + off) % W) + W) % W), 8, 5, false);
+      // ciudad en el horizonte (se desplaza al girar)
       for (const c of this.city) {
         const top = hy - c.h;
-        b.fillStyle = DIM;
-        for (let x = c.x; x < c.x + c.w; x++) b.fillRect(x, top, 1, 1);
-        b.fillRect(c.x, top, 1, c.h); b.fillRect(c.x + c.w - 1, top, 1, c.h);
-        b.fillStyle = ON;
-        for (const [wx, wy, ph] of c.wins) if (Math.sin(t * 0.25 + ph) > -0.6) b.fillRect(c.x + wx, top + wy, 1, 1);
+        for (const base of [((c.x + off) % W + W) % W, ((c.x + off) % W + W) % W - W]) {
+          if (base + c.w < 0 || base >= W) continue;
+          b.fillStyle = DIM;
+          for (let x = base; x < base + c.w; x++) b.fillRect(x, top, 1, 1);
+          b.fillRect(base, top, 1, c.h); b.fillRect(base + c.w - 1, top, 1, c.h);
+          b.fillStyle = ON;
+          for (const [wx, wy, ph] of c.wins) if (Math.sin(t * 0.25 + ph) > -0.6) b.fillRect(base + wx, top + wy, 1, 1);
+        }
       }
       b.fillStyle = ON; b.fillRect(0, hy, W, 1);
       b.clearRect(0, hy + 1, W, H - hy - 1);
-      // bordes de la carretera
-      const edge = (p, side) => vx + side * (5 + p * 150);
+      // bordes de la carretera (curvados según el giro)
+      const edge = (p, side) => vx + shift(p) + side * (5 + p * 150);
       for (let y = hy + 1; y < H; y++) {
         const p = (y - hy) / (H - hy);
         b.fillStyle = ON; b.fillRect(Math.round(edge(p, -1)), y, 1, 1); b.fillRect(Math.round(edge(p, 1)), y, 1, 1);
@@ -128,7 +142,7 @@
         const z0 = frac(k / 8 + this.roadZ), p0 = z0 * z0, p1 = Math.min(1, (z0 + 0.05) * (z0 + 0.05));
         const y0 = Math.round(hy + 1 + (H - hy - 1) * p0), y1 = Math.round(hy + 1 + (H - hy - 1) * p1);
         const w = Math.max(1, Math.round(1 + p0 * 4));
-        b.fillStyle = ON; b.fillRect(vx - (w >> 1), y0, w, Math.max(1, y1 - y0));
+        b.fillStyle = ON; b.fillRect(Math.round(vx + shift(p0)) - (w >> 1), y0, w, Math.max(1, y1 - y0));
       }
       // farolas a ambos lados
       for (let k = 0; k < 6; k++) {
@@ -145,19 +159,27 @@
           if (p > 0.15) { b.fillStyle = DIM; for (let g = 2; g < 2 + p * 9; g += 2) b.fillRect(lx - (g >> 1), top + 1 + g, (g | 1), 1); }
         }
       }
-      // coche delante con las luces traseras (sube y baja con el bajo)
-      const bob = Math.round(Math.sin(t * 9) * 0.4 + au.bass * 1.5);
-      const cx = vx + Math.round(Math.sin(t * 0.4) * 6), cy = 40 - bob;
-      b.clearRect(cx - 9, cy - 5, 19, 9);
+      // coche delante con las luces traseras: sigue la curva y bota con el bajo
+      const bob = Math.round(Math.sin(t * 9) * (kmh > 2 ? 0.4 : 0) + au.bass * 1.5);
+      const cp = (40 - hy) / (H - hy);
+      const cx = Math.round(vx + shift(cp) + Math.sin(t * 0.4) * 3), cy = 40 - bob;
+      b.clearRect(cx - 9, cy - 6, 19, 10);
       b.fillStyle = DIM; b.fillRect(cx - 8, cy - 4, 17, 1); b.fillRect(cx - 9, cy - 3, 1, 5); b.fillRect(cx + 9, cy - 3, 1, 5); b.fillRect(cx - 9, cy + 2, 19, 1);
       b.fillRect(cx - 6, cy - 6, 13, 1); b.fillRect(cx - 7, cy - 5, 1, 1); b.fillRect(cx + 7, cy - 5, 1, 1);
       b.fillStyle = ON; b.fillRect(cx - 8, cy - 1, 3, 2); b.fillRect(cx + 6, cy - 1, 3, 2);
+      if (realSpeed && kmh < 3) { b.fillRect(cx - 9, cy - 2, 4, 3); b.fillRect(cx + 6, cy - 2, 4, 3); } // luces de freno
       b.fillRect(cx - 2, cy + 1, 5, 1); // matrícula
-      // velocímetro
-      const kmh = Math.round(80 + au.energy * 90 + Math.sin(t) * 3);
-      b.clearRect(2, H - 12, 50, 12);
+      // velocímetro: real con GPS; "---" mientras busca satélites
+      b.clearRect(2, H - 12, 62, 12);
       b.fillStyle = ON; b.font = 'bold 11px Consolas, "Lucida Console", monospace'; b.textBaseline = 'top'; b.textAlign = 'left';
-      b.fillText(kmh + 'km/h', 3, H - 11);
+      if (realSpeed) {
+        const txt = Math.round(kmh) + 'km/h';
+        b.fillText(txt, 3, H - 11);
+        const tw = b.measureText(txt).width;
+        b.fillStyle = DIM; b.font = 'bold 8px Consolas, monospace'; b.fillText('GPS', 6 + tw, H - 9);
+      } else if (drive && drive.active) {
+        if (Math.floor(t * 2) % 2) b.fillText('---km/h', 3, H - 11);
+      } else b.fillText(Math.round(kmh) + 'km/h', 3, H - 11);
     }
 
     // ---------------- puerto pesquero ----------------
